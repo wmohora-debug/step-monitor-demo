@@ -1,5 +1,5 @@
 import { apiClient } from "../../../core/api/client";
-import { LoginDto, AuthResponseDto, ForgotPasswordDto, ForgotPasswordResponseDto } from "../../../core/types";
+import { LoginDto, AuthResponseDto, ForgotPasswordDto, ForgotPasswordResponseDto, UserResponseDto } from "../../../core/types";
 
 export const authService = {
   /**
@@ -25,5 +25,12 @@ export const authService = {
    */
   revokeSessions: (userId: string): Promise<void> => {
     return apiClient.delete<void>(`/admin/auth/sessions/${userId}`);
+  },
+
+  /**
+   * Fetches the currently authenticated administrator's profile.
+   */
+  getMe: (): Promise<UserResponseDto> => {
+    return apiClient.get<UserResponseDto>("/admin/auth/me");
   },
 };

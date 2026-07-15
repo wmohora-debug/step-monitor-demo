@@ -73,42 +73,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const userId = decoded?.sub;
-      const role = decoded?.role;
-      if (userId) {
-        // Fetch full profile info using API client
-        try {
-          const endpoint = role === "admin" ? `/admin/admins/${userId}` : `/admin/users/${userId}`;
-          const profile = await apiClient.get<UserResponseDto>(endpoint, {
-            skipAuthRedirect: true,
-            suppressErrorLogging: true,
+      // Fetch full profile info from auth/me using API client
+      try {
+        const profile = await apiClient.get<UserResponseDto>("/admin/auth/me", {
+          skipAuthRedirect: true,
+          suppressErrorLogging: true,
+        });
+        setUser(profile);
+        // Persist user details for faster initial load
+        localStorage.setItem(env.storageKeys.user, JSON.stringify(profile));
+      } catch (err) {
+        console.warn("Profile fetch from /admin/auth/me failed, trying fallback:", err);
+        // Fallback to reading stored details or mock default from decoded payload
+        const storedUser = localStorage.getItem(env.storageKeys.user);
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else if (decoded?.sub) {
+          setUser({
+            id: decoded.sub,
+            email: decoded.email || "",
+            firstName: "Super",
+            lastName: "Admin",
+            phone: null,
+            profileImage: null,
+            role: { id: "admin-role", name: decoded.role || "Admin", slug: decoded.role || "admin" },
+            schoolId: null,
+            selectedClassroomId: null,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           });
-          setUser(profile);
-          // Persist user details for faster initial load
-          localStorage.setItem(env.storageKeys.user, JSON.stringify(profile));
-        } catch {
-          // If user fetch fails (e.g. user is superadmin and not in standard users table),
-          // fallback to reading stored details or mock default from decoded payload
-          const storedUser = localStorage.getItem(env.storageKeys.user);
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          } else {
-            // Minimal profile from JWT
-            setUser({
-              id: userId,
-              email: decoded.email || "",
-              firstName: "Super",
-              lastName: "Admin",
-              phone: null,
-              profileImage: null,
-              role: { id: "admin-role", name: decoded.role || "Admin", slug: decoded.role || "admin" },
-              schoolId: null,
-              selectedClassroomId: null,
-              isActive: true,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            });
-          }
         }
       }
     } catch (error) {
@@ -154,22 +148,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClientCookie(env.storageKeys.accessToken, accessToken, maxAge);
       setClientCookie(env.storageKeys.refreshToken, refreshToken, maxAge * 10); // Refresh token lasts longer
 
-      // Extract details and sync profile
-      const decoded = decodeJwt(accessToken);
-      const userId = decoded?.sub;
-      
+      // Fetch profile using /admin/auth/me
       let profile: UserResponseDto;
       try {
-        const endpoint = decoded?.role === "admin" ? `/admin/admins/${userId}` : `/admin/users/${userId}`;
-        profile = await apiClient.get<UserResponseDto>(endpoint, {
+        profile = await apiClient.get<UserResponseDto>("/admin/auth/me", {
           headers: { Authorization: `Bearer ${accessToken}` },
           skipAuthRedirect: true,
           suppressErrorLogging: true,
         });
-      } catch {
-        // Fallback for custom superadmin
+      } catch (err) {
+        console.warn("Failed to fetch profile via /admin/auth/me on login, trying fallback:", err);
+        const decoded = decodeJwt(accessToken);
         profile = {
-          id: userId || "super-admin-id",
+          id: decoded?.sub || "super-admin-id",
           email: credentials.email,
           firstName: "Super",
           lastName: "Admin",
