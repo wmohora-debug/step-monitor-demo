@@ -88,7 +88,8 @@ export default function UsersPage() {
     lastName: "",
     email: "",
     phone: "",
-    roleSlug: "user" as "admin" | "user",
+    password: "",
+    roleSlug: "user" as "superadmin" | "admin" | "user",
     schoolId: "",
     profileImage: "",
   });
@@ -105,7 +106,7 @@ export default function UsersPage() {
         limit,
         search: debouncedSearch || undefined,
         status: filters.status === "active" ? "active" : filters.status === "inactive" ? "inactive" : undefined,
-        roleSlug: filters.roleSlug === "admin" ? "admin" : filters.roleSlug === "user" ? "user" : undefined,
+        roleSlug: filters.roleSlug === "superadmin" ? "superadmin" : filters.roleSlug === "admin" ? "admin" : filters.roleSlug === "user" ? "user" : undefined,
         sortBy: sortBy as any,
         sortOrder,
       });
@@ -146,7 +147,7 @@ export default function UsersPage() {
   // 4. Statistics values calculated from active table
   const statsSummary = useMemo(() => {
     const activeCount = data.filter((u) => u.isActive).length;
-    const adminCount = data.filter((u) => u.role?.slug === "admin").length;
+    const adminCount = data.filter((u) => u.role?.slug === "admin" || u.role?.slug === "superadmin").length;
     return {
       total: total,
       active: activeCount,
@@ -170,6 +171,7 @@ export default function UsersPage() {
       lastName: "",
       email: "",
       phone: "",
+      password: "",
       roleSlug: "user",
       schoolId: "",
       profileImage: "",
@@ -185,7 +187,8 @@ export default function UsersPage() {
       lastName: user.lastName,
       email: user.email || "",
       phone: user.phone || "",
-      roleSlug: (user.role?.slug === "admin" ? "admin" : "user") as "admin" | "user",
+      password: "",
+      roleSlug: (user.role?.slug === "superadmin" ? "superadmin" : user.role?.slug === "admin" ? "admin" : "user") as "superadmin" | "admin" | "user",
       schoolId: user.schoolId || "",
       profileImage: user.profileImage || "",
     });
@@ -284,7 +287,7 @@ export default function UsersPage() {
     e.preventDefault();
     setFormErrors({});
 
-    // Client-side validations
+    // Client-side validations based on latest Swagger role requirements
     const errors: Record<string, string> = {};
     if (!formFields.firstName.trim()) {
       errors.firstName = "First name is required.";
@@ -292,8 +295,33 @@ export default function UsersPage() {
     if (!formFields.lastName.trim()) {
       errors.lastName = "Last name is required.";
     }
-    if (formFields.email && !/\S+@\S+\.\S+/.test(formFields.email)) {
+    if (!formFields.email.trim()) {
+      errors.email = "Email address is required.";
+    } else if (!/\S+@\S+\.\S+/.test(formFields.email)) {
       errors.email = "Please enter a valid email address.";
+    }
+
+    if (formFields.roleSlug === "superadmin") {
+      if (modalMode === "create" && !formFields.password) {
+        errors.password = "Password is required for super admin accounts.";
+      }
+    } else if (formFields.roleSlug === "admin") {
+      if (!formFields.phone.trim()) {
+        errors.phone = "Phone number is required for administrators.";
+      }
+      if (modalMode === "create" && !formFields.password) {
+        errors.password = "Password is required for administrators.";
+      }
+    } else if (formFields.roleSlug === "user") {
+      if (!formFields.phone.trim()) {
+        errors.phone = "Phone number is required for invigilators.";
+      }
+      if (!formFields.schoolId) {
+        errors.schoolId = "Associated center/school is required for invigilators.";
+      }
+      if (!formFields.profileImage.trim()) {
+        errors.profileImage = "Profile image link is required for invigilators.";
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -304,16 +332,36 @@ export default function UsersPage() {
     setIsSubmitting(true);
     try {
       if (modalMode === "create") {
-        const payload: CreateUserDto = {
-          firstName: formFields.firstName,
-          lastName: formFields.lastName,
-          email: formFields.email || null,
-          phone: formFields.phone || null,
-          roleSlug: formFields.roleSlug,
-          schoolId: formFields.schoolId || null,
-          profileImage: formFields.profileImage || null,
-          isActive: true,
-        };
+        let payload: CreateUserDto;
+        if (formFields.roleSlug === "superadmin") {
+          payload = {
+            firstName: formFields.firstName,
+            lastName: formFields.lastName,
+            email: formFields.email,
+            password: formFields.password,
+            roleSlug: "superadmin",
+          };
+        } else if (formFields.roleSlug === "admin") {
+          payload = {
+            firstName: formFields.firstName,
+            lastName: formFields.lastName,
+            email: formFields.email,
+            phone: formFields.phone,
+            password: formFields.password,
+            roleSlug: "admin",
+          };
+        } else {
+          payload = {
+            firstName: formFields.firstName,
+            lastName: formFields.lastName,
+            email: formFields.email,
+            phone: formFields.phone,
+            profileImage: formFields.profileImage,
+            isActive: true,
+            roleSlug: "user",
+            schoolId: formFields.schoolId,
+          };
+        }
         await userService.create(payload);
         success(`User "${formFields.firstName} ${formFields.lastName}" created successfully.`, "User Created");
       } else if (modalMode === "edit" && selectedUser) {
@@ -378,10 +426,11 @@ export default function UsersPage() {
       id: "role",
       header: "Role Clearance",
       cell: (row: UserResponseDto) => {
+        const isSuper = row.role?.slug === "superadmin";
         const isAdmin = row.role?.slug === "admin";
         return (
-          <Badge variant={isAdmin ? "danger" : "secondary"} className="text-[10px] font-bold uppercase tracking-wider">
-            {row.role?.name || "User"}
+          <Badge variant={isSuper || isAdmin ? "danger" : "secondary"} className="text-[10px] font-bold uppercase tracking-wider">
+            {row.role?.name || row.role?.slug || "User"}
           </Badge>
         );
       },
@@ -420,7 +469,7 @@ export default function UsersPage() {
       chips.push({
         key: "roleSlug",
         label: "Role",
-        displayValue: filters.roleSlug === "admin" ? "Administrator" : "Standard User",
+        displayValue: filters.roleSlug === "superadmin" ? "Super Admin" : filters.roleSlug === "admin" ? "Administrator" : "Standard User",
       });
     }
     return chips;
@@ -454,6 +503,7 @@ export default function UsersPage() {
             selected={filters.roleSlug as any}
             onChange={(val) => setFilter("roleSlug", val)}
             options={[
+              { label: "Super Admins", value: "superadmin" },
               { label: "Administrators", value: "admin" },
               { label: "Standard Users", value: "user" },
             ]}
@@ -587,7 +637,7 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-xs font-bold text-foreground">Email Address</span>
+              <span className="text-xs font-bold text-foreground">Email Address <strong className="text-destructive">*</strong></span>
               <Input
                 type="email"
                 placeholder="john.doe@enterprise.com"
@@ -597,51 +647,83 @@ export default function UsersPage() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <span className="text-xs font-bold text-foreground">Phone Number</span>
-              <Input
-                placeholder="+91 98765 43210"
-                value={formFields.phone}
-                onChange={(e) => setFormFields((prev) => ({ ...prev, phone: e.target.value }))}
-              />
-            </div>
+            {modalMode === "create" && (formFields.roleSlug === "superadmin" || formFields.roleSlug === "admin") && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-foreground">Password <strong className="text-destructive">*</strong></span>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={formFields.password}
+                  onChange={(e) => setFormFields((prev) => ({ ...prev, password: e.target.value }))}
+                  error={formErrors.password}
+                />
+              </div>
+            )}
+
+            {(formFields.roleSlug !== "superadmin" || modalMode === "edit") && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-foreground">
+                  Phone Number
+                  {(formFields.roleSlug === "admin" || formFields.roleSlug === "user") && <strong className="text-destructive"> *</strong>}
+                </span>
+                <Input
+                  placeholder="+91 98765 43210"
+                  value={formFields.phone}
+                  onChange={(e) => setFormFields((prev) => ({ ...prev, phone: e.target.value }))}
+                  error={formErrors.phone}
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
-              <span className="text-xs font-bold text-foreground">Role Clearance</span>
+              <span className="text-xs font-bold text-foreground">Role Clearance <strong className="text-destructive">*</strong></span>
               <select
                 value={formFields.roleSlug}
                 onChange={(e) => setFormFields((prev) => ({ ...prev, roleSlug: e.target.value as any }))}
                 className="w-full h-9 rounded-lg border border-input bg-background px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="user">Standard User (Dashboard View Only)</option>
-                <option value="admin">Administrator (Full CRUD Access)</option>
+                <option value="user">Standard User / Invigilator</option>
+                <option value="admin">Administrator</option>
+                <option value="superadmin">Super Administrator</option>
               </select>
             </div>
 
-            <div className="space-y-1.5">
-              <span className="text-xs font-bold text-foreground">Associated Center / School</span>
-              <select
-                value={formFields.schoolId}
-                onChange={(e) => setFormFields((prev) => ({ ...prev, schoolId: e.target.value }))}
-                className="w-full h-9 rounded-lg border border-input bg-background px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">No School Association (Global Admin)</option>
-                {schools.map((school) => (
-                  <option key={school.id} value={school.id}>
-                    {school.schoolName} ({school.schoolId || "Global"})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {(formFields.roleSlug === "user" || modalMode === "edit") && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-foreground">
+                  Associated Center / School
+                  {formFields.roleSlug === "user" && <strong className="text-destructive"> *</strong>}
+                </span>
+                <select
+                  value={formFields.schoolId}
+                  onChange={(e) => setFormFields((prev) => ({ ...prev, schoolId: e.target.value }))}
+                  className="w-full h-9 rounded-lg border border-input bg-background px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">No School Association (Global Admin)</option>
+                  {schools.map((school) => (
+                    <option key={school.id} value={school.id}>
+                      {school.schoolName} ({school.schoolId || "Global"})
+                    </option>
+                  ))}
+                </select>
+                {formErrors.schoolId && <span className="text-[10px] text-destructive font-semibold">{formErrors.schoolId}</span>}
+              </div>
+            )}
 
-            <div className="space-y-1.5">
-              <span className="text-xs font-bold text-foreground">Profile Image Link</span>
-              <Input
-                placeholder="https://cdn.com/avatar.jpg"
-                value={formFields.profileImage}
-                onChange={(e) => setFormFields((prev) => ({ ...prev, profileImage: e.target.value }))}
-              />
-            </div>
+            {(formFields.roleSlug === "user" || modalMode === "edit") && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-foreground">
+                  Profile Image Link
+                  {formFields.roleSlug === "user" && <strong className="text-destructive"> *</strong>}
+                </span>
+                <Input
+                  placeholder="https://cdn.com/avatar.jpg"
+                  value={formFields.profileImage}
+                  onChange={(e) => setFormFields((prev) => ({ ...prev, profileImage: e.target.value }))}
+                  error={formErrors.profileImage}
+                />
+              </div>
+            )}
           </div>
         </FormModalWrapper>
       )}

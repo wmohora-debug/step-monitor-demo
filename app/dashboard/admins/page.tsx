@@ -304,7 +304,7 @@ export default function AdminsPage() {
         const payload: CreateAdminDto = {
           firstName: formFields.firstName,
           lastName: formFields.lastName,
-          email: formFields.email || null,
+          email: formFields.email,
           phone: formFields.phone || null,
           roleSlug: "admin",
           schoolId: formFields.schoolId || null,

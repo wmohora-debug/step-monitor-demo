@@ -29,13 +29,14 @@ export interface UserResponseDto {
  * DTO for creating a new user or administrator.
  */
 export interface CreateUserDto {
-  email?: string | null;
+  email: string;
   firstName: string;
   lastName: string;
   phone?: string | null;
+  password?: string;
   profileImage?: string | null;
   isActive?: boolean;
-  roleSlug?: "admin" | "user";
+  roleSlug: "superadmin" | "admin" | "user";
   schoolId?: string | null;
 }
 
@@ -48,7 +49,7 @@ export interface UpdateUserDto {
   email?: string;
   phone?: string | null;
   profileImage?: string | null;
-  roleSlug?: "admin" | "user";
+  roleSlug?: "superadmin" | "admin" | "user";
   schoolId?: string | null;
 }
 
@@ -67,7 +68,7 @@ export interface UserListQuery {
   limit?: number;
   search?: string;
   status?: "active" | "inactive";
-  roleSlug?: "admin" | "user";
+  roleSlug?: "superadmin" | "admin" | "user";
   sortBy?: "firstName" | "lastName" | "email" | "phone" | "isActive" | "createdAt" | "updatedAt";
   sortOrder?: "asc" | "desc";
 }
