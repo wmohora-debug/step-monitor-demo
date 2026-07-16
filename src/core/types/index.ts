@@ -7,3 +7,4 @@ export * from "./dto";
 export * from "./audit";
 export * from "./role";
 export * from "./grade";
+export * from "./school-score";

@@ -29,6 +29,7 @@ import {
   Activity,
   Calendar,
   GraduationCap,
+  Trophy,
 } from "lucide-react";
 import { cn } from "../../src/core/utils/cn";
 import { Button } from "../../src/components/ui/Button";
@@ -61,11 +62,13 @@ const navigationGroups: NavGroup[] = [
     groupName: "Registry",
     items: [
       { name: "Schools Manager", href: "/dashboard/schools", icon: School },
+      { name: "School Scores", href: "/dashboard/school-scores", icon: Trophy },
       { name: "Standard Users", href: "/dashboard/users", icon: Users },
       { name: "Super Admins", href: "/dashboard/admins", icon: Shield },
       { name: "Grades Management", href: "/dashboard/grades", icon: GraduationCap },
     ],
   },
+
   {
     groupName: "Inventory",
     items: [

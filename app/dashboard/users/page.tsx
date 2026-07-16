@@ -319,9 +319,6 @@ export default function UsersPage() {
       if (!formFields.schoolId) {
         errors.schoolId = "Associated center/school is required for invigilators.";
       }
-      if (!formFields.profileImage.trim()) {
-        errors.profileImage = "Profile image link is required for invigilators.";
-      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -356,7 +353,7 @@ export default function UsersPage() {
             lastName: formFields.lastName,
             email: formFields.email,
             phone: formFields.phone,
-            profileImage: formFields.profileImage,
+            profileImage: formFields.profileImage.trim() || null,
             isActive: true,
             roleSlug: "user",
             schoolId: formFields.schoolId,
@@ -712,10 +709,7 @@ export default function UsersPage() {
 
             {(formFields.roleSlug === "user" || modalMode === "edit") && (
               <div className="space-y-1.5">
-                <span className="text-xs font-bold text-foreground">
-                  Profile Image Link
-                  {formFields.roleSlug === "user" && <strong className="text-destructive"> *</strong>}
-                </span>
+                <span className="text-xs font-bold text-foreground">Profile Image Link</span>
                 <Input
                   placeholder="https://cdn.com/avatar.jpg"
                   value={formFields.profileImage}
