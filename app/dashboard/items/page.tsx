@@ -926,63 +926,67 @@ function ItemsPageContent() {
           <div className="space-y-6 py-2">
             {/* Visual Header: Image & QR Code */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-secondary/35 p-4 rounded-xl border border-border/40">
-              <div className="flex flex-col items-center justify-center p-2 border border-dashed border-border/60 bg-card rounded-lg relative min-h-[160px]">
-                <span className="absolute top-2 left-2 text-[9px] font-bold text-muted-foreground bg-secondary/80 px-1.5 py-0.5 rounded uppercase">
+              <div className="flex flex-col items-center justify-between p-3 border border-dashed border-border/60 bg-card rounded-lg min-h-[180px]">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase self-start">
                   Item Image
                 </span>
-                {selectedItem.image ? (
-                  <img src={selectedItem.image} alt={selectedItem.name} className="max-h-[130px] w-auto object-contain rounded" />
-                ) : (
-                  <div className="flex flex-col items-center text-center p-4">
-                    <Package className="h-10 w-10 text-muted-foreground/50 mb-2" />
-                    <span className="text-[10px] font-semibold text-muted-foreground">No media available</span>
-                  </div>
-                )}
+                <div className="flex-1 flex items-center justify-center w-full mt-2">
+                  {selectedItem.image ? (
+                    <img src={selectedItem.image} alt={selectedItem.name} className="max-h-[110px] w-auto object-contain rounded" />
+                  ) : (
+                    <div className="flex flex-col items-center text-center">
+                      <Package className="h-9 w-9 text-muted-foreground/50 mb-1" />
+                      <span className="text-[10px] font-semibold text-muted-foreground">No media available</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center p-2 border border-dashed border-border/60 bg-card rounded-lg relative min-h-[160px]">
-                <span className="absolute top-2 left-2 text-[9px] font-bold text-muted-foreground bg-secondary/80 px-1.5 py-0.5 rounded uppercase">
+              <div className="flex flex-col items-center justify-between p-3 border border-dashed border-border/60 bg-card rounded-lg min-h-[180px]">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase self-start">
                   System QR Code
                 </span>
-                {isQrLoading ? (
-                  <div className="flex flex-col items-center justify-center p-4">
-                    <RefreshCw className="h-6 w-6 text-primary animate-spin mb-2" />
-                    <span className="text-[10px] font-semibold text-muted-foreground">Loading QR Code...</span>
-                  </div>
-                ) : detailQrUrl ? (
-                  <div className="flex flex-col items-center">
-                    <img src={detailQrUrl} alt="Item QR Code" className="h-[120px] w-[120px] object-contain" />
-                    <div className="flex gap-1.5 mt-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleDownloadQr}
-                        className="h-7 text-[10px] font-bold text-primary gap-1 px-2 cursor-pointer"
-                      >
-                        <Download className="h-3 w-3" /> Download
-                      </Button>
-                      <PermissionGate permission="items.update">
+                <div className="flex-1 flex items-center justify-center w-full mt-2">
+                  {isQrLoading ? (
+                    <div className="flex flex-col items-center justify-center">
+                      <RefreshCw className="h-6 w-6 text-primary animate-spin mb-2" />
+                      <span className="text-[10px] font-semibold text-muted-foreground">Loading QR Code...</span>
+                    </div>
+                  ) : detailQrUrl ? (
+                    <div className="flex flex-col items-center">
+                      <img src={detailQrUrl} alt="Item QR Code" className="h-[100px] w-[100px] object-contain" />
+                      <div className="flex gap-1 mt-1.5">
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={isRegeneratingQr}
-                          onClick={handleRegenerateQr}
-                          className="h-7 text-[10px] font-bold text-primary gap-1 px-2 cursor-pointer"
+                          onClick={handleDownloadQr}
+                          className="h-6 text-[10px] font-bold text-primary gap-1 px-2 cursor-pointer"
                         >
-                          <RefreshCw className={`h-3 w-3 ${isRegeneratingQr ? "animate-spin" : ""}`} />
-                          {isRegeneratingQr ? "Regenerating..." : "Regenerate"}
+                          <Download className="h-3 w-3" /> Download
                         </Button>
-                      </PermissionGate>
+                        <PermissionGate permission="items.update">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isRegeneratingQr}
+                            onClick={handleRegenerateQr}
+                            className="h-6 text-[10px] font-bold text-primary gap-1 px-2 cursor-pointer"
+                          >
+                            <RefreshCw className={`h-3 w-3 ${isRegeneratingQr ? "animate-spin" : ""}`} />
+                            {isRegeneratingQr ? "Regenerating..." : "Regenerate"}
+                          </Button>
+                        </PermissionGate>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center text-center p-4">
-                    <QrCode className="h-10 w-10 text-muted-foreground/50 mb-2" />
-                    <span className="text-[10px] font-semibold text-muted-foreground">
-                      {qrError ? "Failed to load QR code" : "QR not generated"}
-                    </span>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex flex-col items-center text-center">
+                      <QrCode className="h-9 w-9 text-muted-foreground/50 mb-1" />
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {qrError ? "Failed to load QR code" : "QR not generated"}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
