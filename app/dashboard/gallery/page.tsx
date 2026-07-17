@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "../../../src/core/context/AuthContext";
 import { useToast } from "../../../src/components/ui/Toast";
 import { useDebounce } from "../../../src/core/hooks";
@@ -34,6 +34,7 @@ import {
   ChevronRight,
   RefreshCw,
   ExternalLink,
+  Upload,
 } from "lucide-react";
 import { cn } from "../../../src/core/utils/cn";
 
@@ -87,6 +88,105 @@ export default function GalleryPage() {
   const [galleryIdToDelete, setGalleryIdToDelete] = useState<string | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Create / Upload states
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploadSchoolId, setUploadSchoolId] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadDescription, setUploadDescription] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // S3 Presigned URLs mapping state
+  const [presignedUrls, setPresignedUrls] = useState<Record<string, string>>({});
+  const [resolvingUrls, setResolvingUrls] = useState<Record<string, boolean>>({});
+
+  // Batch resolve S3 URIs to presigned URLs
+  const resolveS3Uris = useCallback(async (urisToResolve: string[]) => {
+    const s3Uris = urisToResolve.filter(
+      (uri) => uri && uri.startsWith("s3://") && !presignedUrls[uri] && !resolvingUrls[uri]
+    );
+
+    if (s3Uris.length === 0) return;
+
+    // Mark as resolving to prevent duplicate requests
+    setResolvingUrls((prev) => {
+      const next = { ...prev };
+      s3Uris.forEach((u) => {
+        next[u] = true;
+      });
+      return next;
+    });
+
+    try {
+      const res = await fetch("/api/gallery/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uris: s3Uris }),
+      });
+      
+      if (!res.ok) throw new Error("Failed to sign URLs");
+      
+      const data = await res.json();
+      const newUrls: Record<string, string> = {};
+      
+      if (data.results && Array.isArray(data.results)) {
+        data.results.forEach((item: { uri: string; url?: string; error?: string }) => {
+          if (item.url) {
+            newUrls[item.uri] = item.url;
+          }
+        });
+      }
+
+      setPresignedUrls((prev) => ({ ...prev, ...newUrls }));
+    } catch (err) {
+      console.error("Error resolving S3 URLs:", err);
+    } finally {
+      setResolvingUrls((prev) => {
+        const next = { ...prev };
+        s3Uris.forEach((u) => {
+          delete next[u];
+        });
+        return next;
+      });
+    }
+  }, [presignedUrls, resolvingUrls]);
+
+  const getDisplayUrl = useCallback((uri: string | null | undefined): string => {
+    if (!uri) return "";
+    if (!uri.startsWith("s3://")) return uri;
+    return presignedUrls[uri] || "";
+  }, [presignedUrls]);
+
+  const isUrlResolving = useCallback((uri: string | null | undefined): boolean => {
+    if (!uri || !uri.startsWith("s3://")) return false;
+    return !presignedUrls[uri];
+  }, [presignedUrls]);
+
+  // Automatically trigger S3 URI resolution when list items load
+  useEffect(() => {
+    const allUris: string[] = [];
+    items.forEach((item) => {
+      if (item.images && Array.isArray(item.images)) {
+        item.images.forEach((img) => {
+          if (img) allUris.push(img);
+        });
+      }
+    });
+    if (allUris.length > 0) {
+      resolveS3Uris(allUris);
+    }
+  }, [items, resolveS3Uris]);
+
+  // Automatically trigger S3 URI resolution when detailed item loads
+  useEffect(() => {
+    if (detailedItem && detailedItem.images && Array.isArray(detailedItem.images)) {
+      resolveS3Uris(detailedItem.images);
+    }
+  }, [detailedItem, resolveS3Uris]);
+  const previewUrlsRef = useRef<string[]>([]);
 
   // Preload schools list for Super Admin's school selector filter
   const fetchSchools = useCallback(async () => {
@@ -219,6 +319,106 @@ export default function GalleryPage() {
     setPage(1);
   };
 
+  // Keep preview URLs ref updated for cleanup on unmount
+  useEffect(() => {
+    previewUrlsRef.current = filePreviews;
+  }, [filePreviews]);
+
+  // Cleanup preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      previewUrlsRef.current.forEach((url) => {
+        if (url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, []);
+
+  const cleanupPreviews = useCallback((urls: string[]) => {
+    urls.forEach((url) => {
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const filesArray = Array.from(e.target.files);
+    
+    // Validate that they are images
+    const validImageFiles = filesArray.filter((file) => file.type.startsWith("image/"));
+    if (validImageFiles.length === 0) {
+      toastError("Please select valid image files.");
+      return;
+    }
+    
+    const newPreviews = validImageFiles.map((file) => URL.createObjectURL(file));
+    setSelectedFiles((prev) => [...prev, ...validImageFiles]);
+    setFilePreviews((prev) => [...prev, ...newPreviews]);
+  };
+
+  const handleRemoveFile = (indexToRemove: number) => {
+    if (filePreviews[indexToRemove]) {
+      URL.revokeObjectURL(filePreviews[indexToRemove]);
+    }
+    setSelectedFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setFilePreviews((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleCloseUpload = () => {
+    setIsUploadOpen(false);
+    setUploadSchoolId("");
+    setUploadTitle("");
+    setUploadDescription("");
+    cleanupPreviews(filePreviews);
+    setSelectedFiles([]);
+    setFilePreviews([]);
+    setUploadError(null);
+  };
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setUploadError(null);
+
+    if (!uploadSchoolId) {
+      setUploadError("Please select a school.");
+      return;
+    }
+    if (!uploadTitle.trim()) {
+      setUploadError("Please enter a title.");
+      return;
+    }
+    if (selectedFiles.length === 0) {
+      setUploadError("Please select at least one image.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      await galleryService.create({
+        schoolId: uploadSchoolId,
+        title: uploadTitle.trim(),
+        description: uploadDescription.trim() || undefined,
+        images: selectedFiles,
+      });
+
+      success("Gallery entry created successfully!");
+      handleCloseUpload();
+      
+      // Refresh list
+      setPage(1);
+      fetchGalleries();
+    } catch (err: any) {
+      toastError(err.message || "Failed to upload gallery entry.");
+      setUploadError(err.message || "Failed to create gallery entry.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* 1. Page Header Description */}
@@ -234,6 +434,14 @@ export default function GalleryPage() {
             Browse and review classroom scan images, QR asset check-in photos, and school network infrastructure verification media.
           </p>
         </div>
+        {isSuper && (
+          <Button
+            onClick={() => setIsUploadOpen(true)}
+            className="shrink-0 gap-2 h-10 rounded-lg font-bold shadow-sm self-start lg:self-center cursor-pointer"
+          >
+            <Upload className="h-4 w-4" /> Upload Photos
+          </Button>
+        )}
       </div>
 
       {/* 2. Controls & Search strip */}
@@ -346,7 +554,11 @@ export default function GalleryPage() {
           </div>
 
           <h2 className="text-base font-bold text-foreground mb-1">
-            {searchQuery || selectedSchoolId ? "No matching gallery records" : "No gallery media available"}
+            {searchQuery || selectedSchoolId
+              ? "No matching gallery records"
+              : isSuper
+              ? "No gallery records yet"
+              : "No gallery media available"}
           </h2>
           <p className="text-xs text-muted-foreground text-center max-w-sm leading-relaxed mb-6">
             {searchQuery || selectedSchoolId
@@ -354,7 +566,7 @@ export default function GalleryPage() {
               : "Gallery media will appear here when verification records are added by invigilators or scanning devices."}
           </p>
 
-          {(searchQuery || selectedSchoolId) && (
+          {searchQuery || selectedSchoolId ? (
             <Button
               onClick={handleResetFilters}
               variant="outline"
@@ -363,6 +575,16 @@ export default function GalleryPage() {
             >
               Reset Search & Filters
             </Button>
+          ) : (
+            isSuper && (
+              <Button
+                onClick={() => setIsUploadOpen(true)}
+                size="sm"
+                className="h-9 rounded-lg font-bold gap-2 cursor-pointer"
+              >
+                <Upload className="h-4 w-4" /> Upload Photos
+              </Button>
+            )
           )}
 
           {/* Clean grid silhouette as background context representation */}
@@ -388,10 +610,10 @@ export default function GalleryPage() {
                 >
                   {/* Thumbnail display */}
                   <div className="aspect-[4/3] relative overflow-hidden bg-slate-950 flex items-center justify-center shrink-0 border-b border-border/30">
-                    {primaryImage ? (
+                    {primaryImage && !isUrlResolving(primaryImage) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={primaryImage}
+                        src={getDisplayUrl(primaryImage)}
                         alt={item.title}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         onError={(e) => {
@@ -404,13 +626,24 @@ export default function GalleryPage() {
                       />
                     ) : null}
 
+                    {/* Loading State */}
+                    {primaryImage && isUrlResolving(primaryImage) && (
+                      <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                        <RefreshCw className="h-5 w-5 animate-spin text-indigo-400" />
+                      </div>
+                    )}
+
                     {/* Placeholder when image is missing or loading fails */}
                     <div className={cn(
                       "fallback-media flex flex-col items-center justify-center text-slate-500 gap-1.5 absolute inset-0 bg-slate-900",
-                      primaryImage ? "hidden" : ""
+                      primaryImage && !isUrlResolving(primaryImage) ? "hidden" : ""
                     )}>
-                      <ImageIcon className="h-8 w-8 opacity-40 text-slate-400" />
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-500">No Image</span>
+                      {primaryImage && isUrlResolving(primaryImage) ? null : (
+                        <>
+                          <ImageIcon className="h-8 w-8 opacity-40 text-slate-400" />
+                          <span className="text-[9px] uppercase font-bold tracking-wider text-slate-500">No Image</span>
+                        </>
+                      )}
                     </div>
 
                     {/* Multi-images indicator badge */}
@@ -566,20 +799,29 @@ export default function GalleryPage() {
 
                 {/* Main Selected Image */}
                 <div className="aspect-[16/9] w-full rounded-xl bg-slate-950 overflow-hidden relative border border-border/30 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={detailedItem.images[activeImageIndex]}
-                    alt={`${detailedItem.title} - Active`}
-                    className="w-full h-full object-contain"
-                  />
-                  <a
-                    href={detailedItem.images[activeImageIndex]}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute right-3 bottom-3 p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-950 text-white border border-white/10 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider"
-                  >
-                    View Source <ExternalLink className="h-3 w-3" />
-                  </a>
+                  {!isUrlResolving(detailedItem.images[activeImageIndex]) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={getDisplayUrl(detailedItem.images[activeImageIndex])}
+                      alt={`${detailedItem.title} - Active`}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                      <RefreshCw className="h-8 w-8 animate-spin text-indigo-400" />
+                    </div>
+                  )}
+                  
+                  {!isUrlResolving(detailedItem.images[activeImageIndex]) && getDisplayUrl(detailedItem.images[activeImageIndex]) && (
+                    <a
+                      href={getDisplayUrl(detailedItem.images[activeImageIndex])}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="absolute right-3 bottom-3 p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-950 text-white border border-white/10 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider"
+                    >
+                      View Source <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
                 </div>
 
                 {/* Thumbnails row */}
@@ -590,18 +832,24 @@ export default function GalleryPage() {
                         key={idx}
                         onClick={() => setActiveImageIndex(idx)}
                         className={cn(
-                          "aspect-[4/3] w-20 rounded-lg overflow-hidden shrink-0 border-2 bg-slate-950 transition-all",
+                          "aspect-[4/3] w-20 rounded-lg overflow-hidden shrink-0 border-2 bg-slate-950 transition-all cursor-pointer",
                           idx === activeImageIndex
                             ? "border-indigo-500 ring-2 ring-indigo-500/20"
                             : "border-transparent opacity-65 hover:opacity-100"
                         )}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={img}
-                          alt={`${detailedItem.title} thumbnail ${idx}`}
-                          className="w-full h-full object-cover"
-                        />
+                        {!isUrlResolving(img) ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={getDisplayUrl(img)}
+                            alt={`${detailedItem.title} thumbnail ${idx}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                            <RefreshCw className="h-4 w-4 animate-spin text-indigo-400" />
+                          </div>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -640,6 +888,149 @@ export default function GalleryPage() {
           isLoading={deleteLoading}
         />
       )}
+
+      {/* 6. UPLOAD PHOTOS MODAL */}
+      <Modal
+        isOpen={isUploadOpen}
+        onClose={handleCloseUpload}
+        size="md"
+        title="Upload Verification Photos"
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCloseUpload}
+              disabled={isUploading}
+              className="rounded-lg cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleUploadSubmit}
+              disabled={isUploading}
+              className="rounded-lg cursor-pointer font-bold gap-2"
+            >
+              {isUploading ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Uploading...
+                </>
+              ) : (
+                "Upload & Publish"
+              )}
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleUploadSubmit} className="space-y-4 py-2">
+          {uploadError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{uploadError}</span>
+            </div>
+          )}
+
+          {/* School selection */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              Target School <span className="text-rose-500">*</span>
+            </label>
+            <Select
+              value={uploadSchoolId}
+              onChange={(e) => setUploadSchoolId(e.target.value)}
+              className="h-10 text-xs rounded-lg bg-background/50"
+              required
+            >
+              <option value="" disabled>Select a school...</option>
+              {schools.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.schoolName}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          {/* Title */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              Gallery Title <span className="text-rose-500">*</span>
+            </label>
+            <Input
+              type="text"
+              placeholder="e.g. Science Lab Equipment Setup"
+              value={uploadTitle}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              className="h-10 text-xs rounded-lg bg-background/50 border-input"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              Description / Notes (Optional)
+            </label>
+            <textarea
+              placeholder="Add verification notes, inspection feedback, or item condition details..."
+              value={uploadDescription}
+              onChange={(e) => setUploadDescription(e.target.value)}
+              rows={3}
+              className="w-full text-xs p-3 rounded-lg border border-border/80 bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/45 resize-none"
+            />
+          </div>
+
+          {/* Multi-image upload */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              Upload Images <span className="text-rose-500">*</span>
+            </label>
+            
+            <div className="border border-dashed border-border/80 rounded-xl p-6 text-center hover:bg-secondary/20 hover:border-indigo-500/30 transition-all cursor-pointer relative bg-background/30">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isUploading}
+              />
+              <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
+                <div className="p-2.5 bg-secondary rounded-lg border border-border/40 text-muted-foreground">
+                  <ImageIcon className="h-5 w-5 text-indigo-400" />
+                </div>
+                <span className="text-xs font-bold text-foreground">Click to browse photos</span>
+                <span className="text-[10px] text-muted-foreground">Multiple image files accepted (PNG, JPG, JPEG, WEBP)</span>
+              </div>
+            </div>
+
+            {/* Selected File Previews */}
+            {filePreviews.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Selected Photos ({filePreviews.length})
+                </span>
+                <div className="grid grid-cols-4 gap-2.5 max-h-[160px] overflow-y-auto p-1.5 border border-border/30 bg-secondary/15 rounded-lg">
+                  {filePreviews.map((preview, idx) => (
+                    <div key={idx} className="aspect-[4/3] rounded-lg overflow-hidden border border-border/40 relative group bg-slate-950">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={preview} alt={`preview ${idx}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(idx)}
+                        disabled={isUploading}
+                        className="absolute top-1 right-1 p-1 bg-rose-950/80 border border-rose-500/30 hover:bg-rose-900 text-white rounded-md transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

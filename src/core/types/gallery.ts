@@ -34,3 +34,13 @@ export interface GalleryListQuery {
   sortBy?: "title" | "createdAt" | "updatedAt";
   sortOrder?: "asc" | "desc";
 }
+
+/**
+ * Payload structure for creating a new gallery record.
+ */
+export interface CreateGalleryPayload {
+  schoolId: string;
+  title: string;
+  description?: string;
+  images: File[];
+}

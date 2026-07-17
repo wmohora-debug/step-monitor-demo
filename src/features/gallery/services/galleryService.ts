@@ -3,6 +3,7 @@ import {
   GalleryResponseDto,
   GalleryListQuery,
   PaginatedGalleryResponseDto,
+  CreateGalleryPayload,
 } from "../../../core/types";
 
 export const galleryService = {
@@ -25,5 +26,22 @@ export const galleryService = {
    */
   remove: (id: string): Promise<void> => {
     return apiClient.delete<void>(`/admin/gallery/${id}`);
+  },
+
+  /**
+   * Creates a new gallery entry with multi-image upload (Super Admin only).
+   */
+  create: (payload: CreateGalleryPayload): Promise<GalleryResponseDto> => {
+    const formData = new FormData();
+    formData.append("schoolId", payload.schoolId);
+    formData.append("title", payload.title);
+    if (payload.description) {
+      formData.append("description", payload.description);
+    }
+    payload.images.forEach((image) => {
+      formData.append("images", image);
+    });
+
+    return apiClient.upload<GalleryResponseDto>("/admin/gallery", formData);
   },
 };
