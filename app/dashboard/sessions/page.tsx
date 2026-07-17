@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useAuth } from "../../../src/core/context/AuthContext";
 import { scanSessionService, InvigilationSessionResponseDto, ItemScanSessionResponseDto } from "../../../src/features/sessions/services/scanSessionService";
 import { schoolService } from "../../../src/features/schools/services/schoolService";
 import { SchoolResponseDto } from "../../../src/core/types";
@@ -249,10 +250,244 @@ export default function SessionsLogPage() {
     },
   ], []);
 
+  const { user } = useAuth();
+  const isDeptAdmin = user?.role?.slug === "admin";
+
+  if (isDeptAdmin) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* 1. Header */}
+        <div className="space-y-1">
+          <h1 className="text-xl font-bold text-slate-900">Activity Scan Logs</h1>
+          <p className="text-xs text-slate-500">
+            Review asset scans and invigilation check-in records.
+          </p>
+        </div>
+
+        {/* 2. Compact Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="border border-slate-200 bg-white p-5 rounded-lg shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-slate-500">Total Asset Scans</span>
+              <h3 className="text-xl font-bold text-slate-900">{scanTotal.toLocaleString()}</h3>
+              <p className="text-[11px] text-slate-400">Items checked in system wide</p>
+            </div>
+            <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
+              <QrCode className="h-5 w-5 text-blue-600" />
+            </div>
+          </div>
+
+          <div className="border border-slate-200 bg-white p-5 rounded-lg shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-slate-500">Total Check-Ins</span>
+              <h3 className="text-xl font-bold text-slate-900">{invTotal.toLocaleString()}</h3>
+              <p className="text-[11px] text-slate-400">Invigilator sessions logged</p>
+            </div>
+            <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
+              <ClipboardList className="h-5 w-5 text-emerald-600" />
+            </div>
+          </div>
+
+          <div className="border border-slate-200 bg-white p-5 rounded-lg shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-slate-500">Monitoring Status</span>
+              <h3 className="text-xl font-bold text-slate-900">Active</h3>
+              <p className="text-[11px] text-slate-400">All logs fully synchronized</p>
+            </div>
+            <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
+              <RefreshCw className="h-5 w-5 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Filter/Control Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-2">
+          {/* Tab Navigation */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleTabChange("scans")}
+              className={`pb-2 px-1 text-xs font-semibold tracking-wide transition-all cursor-pointer border-b-2 ${
+                activeTab === "scans"
+                  ? "border-blue-600 text-blue-600 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Asset Scan Logs
+            </button>
+            <button
+              onClick={() => handleTabChange("invigilation")}
+              className={`pb-2 px-1 text-xs font-semibold tracking-wide transition-all cursor-pointer border-b-2 ${
+                activeTab === "invigilation"
+                  ? "border-blue-600 text-blue-600 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Invigilation Check-ins
+            </button>
+          </div>
+
+          {/* School Selector / Search */}
+          <div className="flex items-center gap-3 self-end sm:self-center">
+            {activeTab === "scans" && schools.length > 0 && (
+              <div className="w-64">
+                <FilterDropdown
+                  label="Filter School"
+                  selected={selectedSchoolId}
+                  onChange={(val) => setSelectedSchoolId(String(val || ""))}
+                  options={schools.map((s) => ({ label: s.schoolName, value: s.id }))}
+                />
+              </div>
+            )}
+            {activeTab === "invigilation" && (
+              <div className="w-64">
+                <Input
+                  placeholder="Search invigilator..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 text-xs rounded border-slate-200 bg-white"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 4. Table */}
+        {activeTab === "scans" ? (
+          <CrudTable
+            columns={scanColumns}
+            data={scanData}
+            idKey="id"
+            isLoading={scanLoading}
+            error={scanError}
+            emptyMessage="No asset scan logs found. Please select a different school."
+            page={scanPage}
+            pageSize={scanLimit}
+            totalPages={Math.ceil(scanTotal / scanLimit)}
+            onPageChange={setScanPage}
+            onRefresh={fetchScanSessions}
+            rowActions={(row) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleOpenScanDetails(row)}
+                className="w-full justify-start gap-2 text-xs font-semibold px-2"
+              >
+                <Eye className="h-3.5 w-3.5 text-muted-foreground" /> View Log Details
+              </Button>
+            )}
+          />
+        ) : (
+          <CrudTable
+            columns={invColumns}
+            data={invData}
+            idKey="id"
+            isLoading={invLoading}
+            error={invError}
+            emptyMessage="No classroom check-in logs found."
+            page={invPage}
+            pageSize={invLimit}
+            totalPages={Math.ceil(invTotal / invLimit)}
+            onPageChange={setInvPage}
+            onRefresh={fetchInvigilation}
+            rowActions={(row) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleOpenInvDetails(row)}
+                className="w-full justify-start gap-2 text-xs font-semibold px-2"
+              >
+                <Eye className="h-3.5 w-3.5 text-muted-foreground" /> View Log Details
+              </Button>
+            )}
+          />
+        )}
+
+        {/* DETAIL MODAL */}
+        {isDetailOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setIsDetailOpen(false)}
+            size="md"
+            title="Activity Log Details"
+            footer={
+              <Button variant="outline" size="sm" onClick={() => setIsDetailOpen(false)}>
+                Close
+              </Button>
+            }
+          >
+            {selectedScan && (
+              <div className="space-y-4 py-2">
+                <div className="bg-secondary/35 p-4 rounded-xl border border-border/40 text-center">
+                  <QrCode className="h-10 w-10 text-primary mx-auto mb-2" />
+                  <h4 className="text-xs font-black text-foreground uppercase tracking-wide">Scanned Item</h4>
+                  <p className="text-sm font-extrabold text-primary">{selectedScan.item?.name}</p>
+                  <p className="text-[10px] font-mono text-muted-foreground">SKU: {selectedScan.item?.sku || "N/A"}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-muted-foreground">
+                  <div className="flex flex-col">
+                    <span>Operator</span>
+                    <span className="font-bold text-foreground mt-0.5">{selectedScan.user?.name || `${selectedScan.user?.firstName} ${selectedScan.user?.lastName}`}</span>
+                    <span className="text-[10px] text-muted-foreground">{selectedScan.user?.email}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span>School Location</span>
+                    <span className="font-bold text-foreground mt-0.5">{selectedScan.school?.schoolName}</span>
+                    <span className="text-[10px] text-muted-foreground">Code: {selectedScan.school?.schoolId}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-border/40 pt-3 flex justify-between text-[10px] font-bold text-muted-foreground">
+                  <span>Scanned At Time:</span>
+                  <span className="text-foreground">{new Date(selectedScan.scannedAt).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {selectedInv && (
+              <div className="space-y-4 py-2">
+                <div className="bg-secondary/35 p-4 rounded-xl border border-border/40 text-center">
+                  <User className="h-10 w-10 text-primary mx-auto mb-2" />
+                  <h4 className="text-xs font-black text-foreground uppercase tracking-wide">Invigilator Check-In</h4>
+                  <p className="text-sm font-extrabold text-primary">{selectedInv.invigilatorName}</p>
+                  <p className="text-[10px] font-mono text-muted-foreground">{selectedInv.phoneNumber || "No phone listed"}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-muted-foreground">
+                  <div className="flex flex-col">
+                    <span>School Venue</span>
+                    <span className="font-bold text-foreground mt-0.5">{selectedInv.school?.schoolName}</span>
+                    <span className="text-[10px] text-muted-foreground">Code: {selectedInv.school?.schoolId}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span>Classroom / Room</span>
+                    <span className="font-bold text-foreground mt-0.5">{selectedInv.classroom?.name}</span>
+                    <span className="text-[10px] text-muted-foreground">ID: {selectedInv.classroom?.classroomId}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-border/40 pt-3 flex justify-between text-[10px] font-bold text-muted-foreground">
+                  <span>Session Status:</span>
+                  <Badge variant={selectedInv.sessionStatus === "CHECKED_IN" ? "success" : "secondary"}>
+                    {selectedInv.sessionStatus}
+                  </Badge>
+                </div>
+                <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                  <span>Checked-in At Time:</span>
+                  <span className="text-foreground">{new Date(selectedInv.checkedInAt).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+          </Modal>
+        )}
+      </div>
+    );
+  }
+
   return (
     <CrudPageTemplate
-      title="Activity Scan logs"
-      description="Inspect item scans history and invigilator check-in sessions."
+      title="Activity Scan Logs"
+      description="Review asset scans and invigilation check-in records."
       searchQuery={activeTab === "invigilation" ? searchQuery : ""}
       onSearchChange={activeTab === "invigilation" ? setSearchQuery : undefined}
       searchPlaceholder="Search by invigilator name or school..."
@@ -268,9 +503,9 @@ export default function SessionsLogPage() {
       }
       stats={
         <>
-          <StatCard title="Total Asset Scans" value={scanTotal} description="Items checked in system wide" icon={<QrCode className="h-5 w-5 text-primary" />} />
-          <StatCard title="Total Check-ins" value={invTotal} description="Invigilator sessions logged" icon={<ClipboardList className="h-5 w-5 text-emerald-500" />} className="border-l-emerald-500/30" />
-          <StatCard title="System Sync" value="Nominal" description="All logs fully indexed" icon={<RefreshCw className="h-5 w-5 text-blue-500" />} />
+          <StatCard title="Total asset scans" value={scanTotal} description="Items checked in system wide" icon={<QrCode className="h-5 w-5 text-primary" />} />
+          <StatCard title="Total check-ins" value={invTotal} description="Invigilator sessions logged" icon={<ClipboardList className="h-5 w-5 text-emerald-500" />} className="border-l-emerald-500/30" />
+          <StatCard title="Monitoring status" value="Active" description="All logs fully synchronized" icon={<RefreshCw className="h-5 w-5 text-blue-500" />} />
         </>
       }
     >
@@ -350,7 +585,7 @@ export default function SessionsLogPage() {
           isOpen={true}
           onClose={() => setIsDetailOpen(false)}
           size="md"
-          title="Activity Log Coordinates"
+          title="Activity Log Details"
           footer={
             <Button variant="outline" size="sm" onClick={() => setIsDetailOpen(false)}>
               Close

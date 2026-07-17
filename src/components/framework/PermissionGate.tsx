@@ -23,11 +23,31 @@ export function PermissionGate({
 
   // Super Admin automatically bypasses all permission gates
   const isSuperAdmin = 
+    user.role?.slug?.toLowerCase() === "superadmin" || 
     user.role?.slug?.toLowerCase() === "super_admin" || 
-    user.role?.slug?.toLowerCase() === "admin" || 
     user.email === "superstep@yopmail.com";
   if (isSuperAdmin) {
     return <>{children}</>;
+  }
+
+  // Department Admin (admin role) has restricted view-only access to specific items
+  const isDeptAdmin = user.role?.slug?.toLowerCase() === "admin";
+  if (isDeptAdmin) {
+    const allowedDeptPermissions = [
+      "reports.view",
+      "reports.export",
+      "sessions.view",
+      "scans.view",
+      "gallery.view"
+    ];
+    const checkPermissions = Array.isArray(permission) ? permission : [permission];
+    const hasPermission = allRequired
+      ? checkPermissions.every((p) => allowedDeptPermissions.includes(p))
+      : checkPermissions.some((p) => allowedDeptPermissions.includes(p));
+
+    if (hasPermission) {
+      return <>{children}</>;
+    }
   }
 
   // Get user's active permissions array (fallback to empty)

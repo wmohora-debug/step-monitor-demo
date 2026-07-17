@@ -33,6 +33,9 @@ import {
   Settings,
   ShieldCheck,
   GraduationCap,
+  Image,
+  Trophy,
+  Activity,
 } from "lucide-react";
 import { cn } from "../../core/utils/cn";
 import { Button, Badge, Modal } from "../ui";
@@ -306,7 +309,7 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ isOpen, onClose, onThemeToggle }: CommandPaletteProps) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -325,7 +328,10 @@ export function CommandPalette({ isOpen, onClose, onThemeToggle }: CommandPalett
 
   // Debounced live global search
   useEffect(() => {
-    if (!query.trim()) {
+    const role = user?.role?.slug?.toLowerCase();
+    const isSuper = role === "superadmin" || role === "super_admin" || user?.email === "superstep@yopmail.com";
+
+    if (!isSuper || !query.trim()) {
       setSchoolsResult([]);
       setUsersResult([]);
       setCategoriesResult([]);
@@ -357,37 +363,61 @@ export function CommandPalette({ isOpen, onClose, onThemeToggle }: CommandPalett
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [query]);
+  }, [query, user]);
 
   // Define static commands
-  const staticCommands = useMemo(() => [
-    { id: "nav-dash", label: "Go to Overview Dashboard", category: "Navigation", icon: FolderTree, action: () => router.push("/dashboard") },
-    { id: "nav-schools", label: "Go to Schools Manager", category: "Navigation", icon: SchoolIcon, action: () => router.push("/dashboard/schools") },
-    { id: "nav-users", label: "Go to Users & Admins", category: "Navigation", icon: UsersIcon, action: () => router.push("/dashboard/users") },
-    { id: "nav-categories", label: "Go to Categories", category: "Navigation", icon: FolderTree, action: () => router.push("/dashboard/categories") },
-    { id: "nav-items", label: "Go to Inventory Items", category: "Navigation", icon: Package, action: () => router.push("/dashboard/items") },
-    { id: "nav-grades", label: "Go to Grades Management", category: "Navigation", icon: GraduationCap, action: () => router.push("/dashboard/grades") },
-    { id: "nav-reports", label: "Go to Reports & System Analytics", category: "Navigation", icon: BarChart3, action: () => router.push("/dashboard/reports") },
-    { id: "nav-settings", label: "Go to System Settings Config", category: "Navigation", icon: Settings, action: () => router.push("/dashboard/settings") },
-    { id: "nav-audit", label: "Go to System Security Audit Logs", category: "Navigation", icon: ShieldCheck, action: () => router.push("/dashboard/audit") },
-    { id: "nav-profile", label: "Go to My Profile", category: "Navigation", icon: User, action: () => router.push("/dashboard/profile") },
-    { id: "act-school", label: "Register New School", category: "Actions", icon: Plus, permission: "schools.create", action: () => router.push("/dashboard/schools?action=create") },
-    { id: "act-user", label: "Register New User Account", category: "Actions", icon: Plus, permission: "users.create", action: () => router.push("/dashboard/users?action=create") },
-    { id: "act-category", label: "Register New Category", category: "Actions", icon: Plus, permission: "categories.create", action: () => router.push("/dashboard/categories?action=create") },
-    { id: "act-item", label: "Register New Inventory Item", category: "Actions", icon: Plus, permission: "items.create", action: () => router.push("/dashboard/items?action=create") },
-    { id: "act-grade", label: "Create New Grade Level", category: "Actions", icon: Plus, permission: "grades.create", action: () => router.push("/dashboard/grades?action=create") },
-    { id: "rep-users", label: "View Users Audit Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=users") },
-    { id: "rep-schools", label: "View Schools Registry Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=schools") },
-    { id: "rep-categories", label: "View Categories Inventory Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=categories") },
-    { id: "rep-items", label: "View Inventory Items Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=items") },
-    { id: "rep-grades", label: "View Grades Registry Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=grades") },
-    { id: "cfg-general", label: "Configure General Settings", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=general") },
-    { id: "cfg-profile", label: "Configure Profile Info Settings", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=profile") },
-    { id: "cfg-security", label: "Configure Security Policy settings", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=security") },
-    { id: "cfg-notifications", label: "Configure Notifications Alert toggles", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=notifications") },
-    { id: "theme-toggle", label: "Toggle Theme Mode (Light / Dark)", category: "System", icon: Moon, action: onThemeToggle },
-    { id: "sys-logout", label: "Sign Out Registry Console", category: "System", icon: LogOut, action: logout },
-  ], [router, logout, onThemeToggle]);
+  const staticCommands = useMemo(() => {
+    const role = user?.role?.slug?.toLowerCase();
+    const isSuper = role === "superadmin" || role === "super_admin" || user?.email === "superstep@yopmail.com";
+    const isDeptAdmin = role === "admin";
+
+    const allCmds = [
+      { id: "nav-dash", label: "Go to Overview Dashboard", category: "Navigation", icon: FolderTree, action: () => router.push("/dashboard") },
+      { id: "nav-schools", label: "Go to Schools Manager", category: "Navigation", icon: SchoolIcon, action: () => router.push("/dashboard/schools") },
+      { id: "nav-users", label: "Go to Users & Admins", category: "Navigation", icon: UsersIcon, action: () => router.push("/dashboard/users") },
+      { id: "nav-categories", label: "Go to Categories", category: "Navigation", icon: FolderTree, action: () => router.push("/dashboard/categories") },
+      { id: "nav-items", label: "Go to Inventory Items", category: "Navigation", icon: Package, action: () => router.push("/dashboard/items") },
+      { id: "nav-grades", label: "Go to Grades Management", category: "Navigation", icon: GraduationCap, action: () => router.push("/dashboard/grades") },
+      { id: "nav-reports", label: "Go to Reports & System Analytics", category: "Navigation", icon: BarChart3, action: () => router.push("/dashboard/reports") },
+      { id: "nav-settings", label: "Go to System Settings Config", category: "Navigation", icon: Settings, action: () => router.push("/dashboard/settings") },
+      { id: "nav-audit", label: "Go to System Security Audit Logs", category: "Navigation", icon: ShieldCheck, action: () => router.push("/dashboard/audit") },
+      { id: "nav-profile", label: "Go to My Profile", category: "Navigation", icon: User, action: () => router.push("/dashboard/profile") },
+      { id: "act-school", label: "Register New School", category: "Actions", icon: Plus, permission: "schools.create", action: () => router.push("/dashboard/schools?action=create") },
+      { id: "act-user", label: "Register New User Account", category: "Actions", icon: Plus, permission: "users.create", action: () => router.push("/dashboard/users?action=create") },
+      { id: "act-category", label: "Register New Category", category: "Actions", icon: Plus, permission: "categories.create", action: () => router.push("/dashboard/categories?action=create") },
+      { id: "act-item", label: "Register New Inventory Item", category: "Actions", icon: Plus, permission: "items.create", action: () => router.push("/dashboard/items?action=create") },
+      { id: "act-grade", label: "Create New Grade Level", category: "Actions", icon: Plus, permission: "grades.create", action: () => router.push("/dashboard/grades?action=create") },
+      { id: "rep-users", label: "View Users Audit Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=users") },
+      { id: "rep-schools", label: "View Schools Registry Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=schools") },
+      { id: "rep-categories", label: "View Categories Inventory Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=categories") },
+      { id: "rep-items", label: "View Inventory Items Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=items") },
+      { id: "rep-grades", label: "View Grades Registry Report", category: "Reports", icon: BarChart3, action: () => router.push("/dashboard/reports?type=grades") },
+      { id: "cfg-general", label: "Configure General Settings", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=general") },
+      { id: "cfg-profile", label: "Configure Profile Info Settings", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=profile") },
+      { id: "cfg-security", label: "Configure Security Policy settings", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=security") },
+      { id: "cfg-notifications", label: "Configure Notifications Alert toggles", category: "Settings", icon: Settings, action: () => router.push("/dashboard/settings?tab=notifications") },
+      { id: "theme-toggle", label: "Toggle Theme Mode (Light / Dark)", category: "System", icon: Moon, action: onThemeToggle },
+      { id: "sys-logout", label: isDeptAdmin ? "Sign Out Operations Portal" : "Sign Out Registry Console", category: "System", icon: LogOut, action: logout },
+    ];
+
+    if (isSuper) {
+      return allCmds;
+    }
+    
+    if (isDeptAdmin) {
+      const allowedIds = [
+        "nav-dash",
+        "nav-reports",
+        "sys-logout"
+      ];
+      return allCmds.filter(cmd => allowedIds.includes(cmd.id)).concat([
+        { id: "nav-sessions", label: "Go to Activity Scan Logs", category: "Navigation", icon: Activity, action: () => router.push("/dashboard/sessions") },
+        { id: "nav-gallery", label: "Go to Gallery Hub", category: "Navigation", icon: Image, action: () => router.push("/dashboard/gallery") }
+      ]);
+    }
+
+    return [];
+  }, [router, logout, onThemeToggle, user]);
 
   // Flattened list of available commands / results
   const itemsList = useMemo(() => {

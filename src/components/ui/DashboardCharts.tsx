@@ -257,9 +257,9 @@ export function DashboardChart({
               // Generate colors
               const colors = [
                 "var(--color-primary)",
-                "color-mix(in srgb, var(--color-primary) 70%, white)",
-                "color-mix(in srgb, var(--color-primary) 40%, white)",
-                "color-mix(in srgb, var(--color-primary) 20%, white)",
+                "color-mix(in srgb, var(--color-primary) 70%, currentColor)",
+                "color-mix(in srgb, var(--color-primary) 45%, currentColor)",
+                "color-mix(in srgb, var(--color-primary) 25%, currentColor)",
               ];
               const fillColor = colors[idx % colors.length];
 
@@ -279,15 +279,15 @@ export function DashboardChart({
             )}
           </g>
         </svg>
-
+ 
         {/* Legend */}
         <div className="flex flex-col gap-2">
           {pieSegments.map((seg, idx) => {
             const colors = [
               "bg-primary",
               "bg-primary/70",
-              "bg-primary/40",
-              "bg-primary/20",
+              "bg-primary/45",
+              "bg-primary/25",
             ];
             const bgClass = colors[idx % colors.length];
 

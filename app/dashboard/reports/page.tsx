@@ -46,13 +46,19 @@ import {
   Tag,
 } from "lucide-react";
 import { useToast } from "../../../src/components/ui/Toast";
+import { useAuth } from "../../../src/core/context/AuthContext";
 
 type ReportType = "users" | "schools" | "categories" | "items";
 
 function ReportsPageContent() {
   const { success, error: toastError, warning } = useToast();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  const role = user?.role?.slug?.toLowerCase();
+  const isSuper = role === "superadmin" || role === "super_admin" || user?.email === "superstep@yopmail.com";
+  const isDeptAdmin = role === "admin";
 
   // 1. Navigation / Selection State
   const [activeReport, setActiveReport] = useState<ReportType>("items");
@@ -103,8 +109,11 @@ function ReportsPageContent() {
   // Fetch report overview stats
   const fetchGlobalStats = useCallback(async () => {
     try {
-      const uRes = await userService.findAll({ page: 1, limit: 1 });
-      await delay(100);
+      let uRes = { total: 0 };
+      if (!isDeptAdmin) {
+        uRes = await userService.findAll({ page: 1, limit: 1 });
+        await delay(100);
+      }
       const sRes = await schoolService.findAll({ page: 1, limit: 1 });
       await delay(100);
       const cRes = await categoryService.findAll({ page: 1, limit: 1 });
@@ -120,7 +129,7 @@ function ReportsPageContent() {
     } catch (err) {
       console.error("Failed to fetch global reports stats:", err);
     }
-  }, []);
+  }, [isDeptAdmin]);
 
   // Fetch detailed drill-down report data based on selected report card
   const fetchReportData = useCallback(async () => {
@@ -239,10 +248,21 @@ function ReportsPageContent() {
   useEffect(() => {
     const type = searchParams.get("type") as ReportType;
     if (type && ["users", "schools", "categories", "items"].includes(type)) {
-      setActiveReport(type);
+      if (type === "users" && isDeptAdmin) {
+        setActiveReport("items");
+      } else {
+        setActiveReport(type);
+      }
       router.replace("/dashboard/reports");
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, isDeptAdmin]);
+
+  // Protective role check for active report state
+  useEffect(() => {
+    if (isDeptAdmin && activeReport === "users") {
+      setActiveReport("items");
+    }
+  }, [activeReport, isDeptAdmin]);
 
   // Sort callback
   const handleSort = (field: string) => {
@@ -597,65 +617,69 @@ function ReportsPageContent() {
     <div className="space-y-6">
       {/* 1. Page Header Description */}
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
-          <BarChart3 className="h-6.5 w-6.5 text-primary" /> Reports & Analytics Console
+        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-primary" /> {isDeptAdmin ? "Reports & Analytics" : "Reports & Analytics Console"}
         </h1>
         <p className="text-xs font-medium text-muted-foreground max-w-2xl leading-relaxed">
-          Monitor registration trends, inventory category distributions, center activation summaries, and access clearance records across the network.
+          {isDeptAdmin
+            ? "Monitor registration trends, inventory category distributions, and classroom check-in activity."
+            : "Monitor registration trends, inventory category distributions, center activation summaries, and access clearance records across the network."}
         </p>
       </div>
 
       {/* 2. Interactive Report Selection Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Users Card */}
-        <Card
-          onClick={() => setActiveReport("users")}
-          className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
-            activeReport === "users"
-              ? "border-primary bg-primary/[0.02] shadow-md"
-              : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
-          }`}
-        >
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Users Report
-              </span>
-              <h3 className="text-xl font-extrabold tracking-tight">
-                {globalStats.users.toLocaleString()}
-              </h3>
-              <p className="text-[10px] font-semibold text-muted-foreground">
-                Administrative Accounts
-              </p>
-            </div>
-            <div className={`p-2.5 rounded-xl ${activeReport === "users" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-              <Users className="h-4.5 w-4.5" />
-            </div>
-          </CardContent>
-        </Card>
+        {!isDeptAdmin && (
+          <Card
+            onClick={() => setActiveReport("users")}
+            className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
+              activeReport === "users"
+                ? "border-primary bg-primary/[0.02] shadow-md"
+                : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
+            }`}
+          >
+            <CardContent className="p-5 flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Users Report
+                </span>
+                <h3 className="text-xl font-extrabold tracking-tight">
+                  {globalStats.users.toLocaleString()}
+                </h3>
+                <p className="text-[10px] font-semibold text-muted-foreground">
+                  Administrative Accounts
+                </p>
+              </div>
+              <div className={`p-2.5 rounded-xl ${activeReport === "users" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                <Users className="h-4.5 w-4.5" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Schools Card */}
         <Card
           onClick={() => setActiveReport("schools")}
           className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
             activeReport === "schools"
-              ? "border-primary bg-primary/[0.02] shadow-md"
+              ? "border-primary bg-primary/[0.02] shadow-xs"
               : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
           }`}
         >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Schools Report
+              <span className="text-xs font-semibold text-slate-500">
+                {isDeptAdmin ? "Schools" : "Schools Report"}
               </span>
-              <h3 className="text-xl font-extrabold tracking-tight">
+              <h3 className="text-xl font-bold tracking-tight text-slate-900">
                 {globalStats.schools.toLocaleString()}
               </h3>
-              <p className="text-[10px] font-semibold text-muted-foreground">
-                Center Registries Active
+              <p className="text-[11px] text-slate-400">
+                {isDeptAdmin ? "Registered centers" : "Center Registries Active"}
               </p>
             </div>
-            <div className={`p-2.5 rounded-xl ${activeReport === "schools" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+            <div className={`p-2.5 rounded-lg ${activeReport === "schools" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
               <School className="h-4.5 w-4.5" />
             </div>
           </CardContent>
@@ -666,23 +690,23 @@ function ReportsPageContent() {
           onClick={() => setActiveReport("categories")}
           className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
             activeReport === "categories"
-              ? "border-primary bg-primary/[0.02] shadow-md"
+              ? "border-primary bg-primary/[0.02] shadow-xs"
               : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
           }`}
         >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Categories Report
+              <span className="text-xs font-semibold text-slate-500">
+                {isDeptAdmin ? "Categories" : "Categories Report"}
               </span>
-              <h3 className="text-xl font-extrabold tracking-tight">
+              <h3 className="text-xl font-bold tracking-tight text-slate-900">
                 {globalStats.categories.toLocaleString()}
               </h3>
-              <p className="text-[10px] font-semibold text-muted-foreground">
-                Inventory Classifications
+              <p className="text-[11px] text-slate-400">
+                {isDeptAdmin ? "Inventory classifications" : "Inventory Classifications"}
               </p>
             </div>
-            <div className={`p-2.5 rounded-xl ${activeReport === "categories" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+            <div className={`p-2.5 rounded-lg ${activeReport === "categories" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
               <Layers className="h-4.5 w-4.5" />
             </div>
           </CardContent>
@@ -693,23 +717,23 @@ function ReportsPageContent() {
           onClick={() => setActiveReport("items")}
           className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
             activeReport === "items"
-              ? "border-primary bg-primary/[0.02] shadow-md"
+              ? "border-primary bg-primary/[0.02] shadow-xs"
               : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
           }`}
         >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Inventory Report
+              <span className="text-xs font-semibold text-slate-500">
+                {isDeptAdmin ? "Inventory items" : "Inventory Report"}
               </span>
-              <h3 className="text-xl font-extrabold tracking-tight">
+              <h3 className="text-xl font-bold tracking-tight text-slate-900">
                 {globalStats.items.toLocaleString()}
               </h3>
-              <p className="text-[10px] font-semibold text-muted-foreground">
-                Trackable Catalog Assets
+              <p className="text-[11px] text-slate-400">
+                {isDeptAdmin ? "Trackable assets" : "Trackable Catalog Assets"}
               </p>
             </div>
-            <div className={`p-2.5 rounded-xl ${activeReport === "items" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+            <div className={`p-2.5 rounded-lg ${activeReport === "items" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
               <Package className="h-4.5 w-4.5" />
             </div>
           </CardContent>
@@ -717,7 +741,7 @@ function ReportsPageContent() {
       </div>
 
       {/* 3. Filtering Toolbar */}
-      <Card className="border border-border/50 bg-secondary/15 backdrop-blur-md">
+      <Card className={`border border-border/50 shadow-sm ${isDeptAdmin ? "bg-white" : "bg-secondary/15 backdrop-blur-md"}`}>
         <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-bold text-muted-foreground flex items-center gap-1.5 shrink-0 uppercase tracking-wider text-[10px]">
@@ -800,31 +824,38 @@ function ReportsPageContent() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              className="h-8 text-[10px] font-bold gap-1 px-2.5 cursor-pointer uppercase tracking-wider"
-              disabled={isLoading || activeTableData.length === 0}
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" /> Export CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExportPlaceholder("excel")}
-              className="h-8 text-[10px] font-bold gap-1 px-2.5 cursor-pointer uppercase tracking-wider"
-            >
-              <Download className="h-3.5 w-3.5 text-blue-500" /> Excel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleExportPlaceholder("pdf")}
-              className="h-8 text-[10px] font-bold gap-1 px-2.5 cursor-pointer uppercase tracking-wider"
-            >
-              <FileText className="h-3.5 w-3.5 text-rose-500" /> PDF
-            </Button>
+            <PermissionGate permission="reports.export">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                className="h-8 text-[10px] font-bold gap-1 px-2.5 cursor-pointer uppercase tracking-wider"
+                disabled={isLoading || activeTableData.length === 0}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" /> Export CSV
+              </Button>
+            </PermissionGate>
+
+            {!isDeptAdmin && (
+              <PermissionGate permission="reports.export">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExportPlaceholder("excel")}
+                  className="h-8 text-[10px] font-bold gap-1 px-2.5 cursor-pointer uppercase tracking-wider"
+                >
+                  <Download className="h-3.5 w-3.5 text-blue-500" /> Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExportPlaceholder("pdf")}
+                  className="h-8 text-[10px] font-bold gap-1 px-2.5 cursor-pointer uppercase tracking-wider"
+                >
+                  <FileText className="h-3.5 w-3.5 text-rose-500" /> PDF
+                </Button>
+              </PermissionGate>
+            )}
           </div>
         </div>
 

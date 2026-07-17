@@ -41,6 +41,7 @@ import { categoryService } from "../../src/features/categories/services/category
 import { itemService } from "../../src/features/items/services/itemService";
 import { apiClient } from "../../src/core/api/client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { cn } from "../../src/core/utils/cn";
 
 const formatDate = (date: Date) => {
@@ -158,16 +159,93 @@ const MetricCard = React.memo(function MetricCard({
   );
 });
 
+interface DeptMetricCardProps {
+  title: string;
+  value: number;
+  description: string;
+  icon: React.ComponentType<any>;
+  isLoading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
+}
+
+const DeptMetricCard = React.memo(function DeptMetricCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+  isLoading,
+  error,
+  onRefresh,
+}: DeptMetricCardProps) {
+  if (isLoading) {
+    return (
+      <Card className="border border-slate-200 bg-white shadow-xs">
+        <CardContent className="p-5 space-y-2">
+          <Skeleton className="h-4 w-1/3 rounded" />
+          <Skeleton className="h-6 w-1/4 rounded" />
+          <Skeleton className="h-3.5 w-1/2 rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border border-red-200 bg-red-50/50 shadow-xs">
+        <CardContent className="p-5 flex flex-col justify-between min-h-[110px]">
+          <div className="space-y-1 flex-1">
+            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">{title} Error</span>
+            <p className="text-[11px] text-muted-foreground line-clamp-2">{error}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            className="w-fit gap-1 text-[10px] h-7 border-red-200 text-red-700 hover:bg-red-50 mt-2"
+          >
+            <RefreshCw className="h-3 w-3" /> Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border border-slate-200 bg-white shadow-xs">
+      <CardContent className="p-5 flex items-center justify-between">
+        <div className="space-y-1.5">
+          <span className="text-xs font-semibold text-slate-500">{title}</span>
+          <h3 className="text-2xl font-bold text-slate-950 tracking-tight">{value.toLocaleString()}</h3>
+          <p className="text-xs text-slate-400">{description}</p>
+        </div>
+        <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
+          <Icon className="h-5 w-5" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
 // Main Dashboard Component
 export default function DashboardOverviewPage() {
   const { user } = useAuth();
   const { success, error: toastError } = useToast();
+
+  const role = user?.role?.slug?.toLowerCase();
+  const isSuper = role === "superadmin" || role === "super_admin" || user?.email === "superstep@yopmail.com";
+  const isDeptAdmin = role === "admin";
 
   // Metrics states
   const [schoolsCount, setSchoolsCount] = useState(0);
   const [usersCount, setUsersCount] = useState(0);
   const [categoriesCount, setCategoriesCount] = useState(0);
   const [itemsCount, setItemsCount] = useState(0);
+
+  // Department Admin specific metrics states
+  const [invSessionsCount, setInvSessionsCount] = useState(0);
+  const [recentInvSessions, setRecentInvSessions] = useState<any[]>([]);
+  const [invSessionsError, setInvSessionsError] = useState<string | null>(null);
 
   // Loading & error trackers
   const [metricsLoading, setMetricsLoading] = useState(true);
@@ -193,46 +271,77 @@ export default function DashboardOverviewPage() {
     setUsersError(null);
     setCategoriesError(null);
     setItemsError(null);
+    setInvSessionsError(null);
 
     const startTime = performance.now();
 
-    const schoolsPromise = apiClient.get<any>("/admin/schools", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
-      .then((res) => {
-        setSchoolsCount(res.total || 0);
-        setRecentSchools(res.items || []);
-        const inactive = (res.items || []).filter((s: any) => !s.isActive);
-        setInactiveSchools(inactive);
-      })
-      .catch((err) => {
-        setSchoolsError(err.message || "Failed to load schools metadata");
-      });
+    if (isDeptAdmin) {
+      // Department Admin: Fetch only allowed data (Schools, Categories, Invigilation Sessions)
+      const schoolsPromise = apiClient.get<any>("/admin/schools", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => {
+          setSchoolsCount(res.total || 0);
+          setRecentSchools(res.items || []);
+        })
+        .catch((err) => {
+          setSchoolsError(err.message || "Failed to load schools metadata");
+        });
 
-    const usersPromise = apiClient.get<any>("/admin/users", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
-      .then((res) => {
-        setUsersCount(res.total || 0);
-        setRecentUsers(res.items || []);
-      })
-      .catch((err) => {
-        setUsersError(err.message || "Failed to load users metadata");
-      });
+      const categoriesPromise = apiClient.get<any>("/admin/categories", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => setCategoriesCount(res.total || 0))
+        .catch((err) => {
+          setCategoriesError(err.message || "Failed to load categories metadata");
+        });
 
-    const categoriesPromise = apiClient.get<any>("/admin/categories", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
-      .then((res) => setCategoriesCount(res.total || 0))
-      .catch((err) => {
-        setCategoriesError(err.message || "Failed to load categories metadata");
-      });
+      const sessionsPromise = apiClient.get<any>("/admin/invigilation-sessions", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => {
+          setInvSessionsCount(res.total || 0);
+          setRecentInvSessions(res.items || []);
+        })
+        .catch((err) => {
+          setInvSessionsError(err.message || "Failed to load classroom sessions metadata");
+        });
 
-    const itemsPromise = apiClient.get<any>("/admin/items", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
-      .then((res) => {
-        setItemsCount(res.total || 0);
-        const inactive = (res.items || []).filter((i: any) => !i.isActive);
-        setInactiveItems(inactive);
-      })
-      .catch((err) => {
-        setItemsError(err.message || "Failed to load inventory items metadata");
-      });
+      await Promise.allSettled([schoolsPromise, categoriesPromise, sessionsPromise]);
+    } else {
+      // Super Admin default fetching logic
+      const schoolsPromise = apiClient.get<any>("/admin/schools", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => {
+          setSchoolsCount(res.total || 0);
+          setRecentSchools(res.items || []);
+          const inactive = (res.items || []).filter((s: any) => !s.isActive);
+          setInactiveSchools(inactive);
+        })
+        .catch((err) => {
+          setSchoolsError(err.message || "Failed to load schools metadata");
+        });
 
-    await Promise.allSettled([schoolsPromise, usersPromise, categoriesPromise, itemsPromise]);
+      const usersPromise = apiClient.get<any>("/admin/users", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => {
+          setUsersCount(res.total || 0);
+          setRecentUsers(res.items || []);
+        })
+        .catch((err) => {
+          setUsersError(err.message || "Failed to load users metadata");
+        });
+
+      const categoriesPromise = apiClient.get<any>("/admin/categories", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => setCategoriesCount(res.total || 0))
+        .catch((err) => {
+          setCategoriesError(err.message || "Failed to load categories metadata");
+        });
+
+      const itemsPromise = apiClient.get<any>("/admin/items", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
+        .then((res) => {
+          setItemsCount(res.total || 0);
+          const inactive = (res.items || []).filter((i: any) => !i.isActive);
+          setInactiveItems(inactive);
+        })
+        .catch((err) => {
+          setItemsError(err.message || "Failed to load inventory items metadata");
+        });
+
+      await Promise.allSettled([schoolsPromise, usersPromise, categoriesPromise, itemsPromise]);
+    }
 
     const duration = Math.round(performance.now() - startTime);
     setLatency(duration);
@@ -243,7 +352,7 @@ export default function DashboardOverviewPage() {
     }
 
     setMetricsLoading(false);
-  }, []);
+  }, [isDeptAdmin]);
 
   useEffect(() => {
     fetchMetrics();
@@ -353,6 +462,125 @@ export default function DashboardOverviewPage() {
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
+
+  if (isDeptAdmin) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-300">
+        {/* 1. HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
+          <div className="space-y-1">
+            <h1 className="text-xl font-bold text-slate-900">Overview</h1>
+            <p className="text-sm font-semibold text-slate-800">
+              Welcome back, {user?.firstName || "Administrator"}
+            </p>
+            <p className="text-xs text-slate-500">
+              Here is a summary of current departmental activity.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded border border-slate-200">
+              {formatDate(new Date())}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncMetrics}
+              disabled={metricsLoading}
+              className="gap-2 h-9 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", metricsLoading && "animate-spin")} />
+              Sync Dashboard
+            </Button>
+          </div>
+        </div>
+
+        {/* 2. SUMMARY CARDS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <DeptMetricCard
+            title="Classroom Sessions"
+            value={invSessionsCount}
+            description="Total invigilation sessions logged"
+            icon={Activity}
+            isLoading={metricsLoading}
+            error={invSessionsError}
+            onRefresh={fetchMetrics}
+          />
+          <DeptMetricCard
+            title="Registered Centers"
+            value={schoolsCount}
+            description="Monitored educational centers"
+            icon={SchoolIcon}
+            isLoading={metricsLoading}
+            error={schoolsError}
+            onRefresh={fetchMetrics}
+          />
+          <DeptMetricCard
+            title="Asset Categories"
+            value={categoriesCount}
+            description="Inventory classifications"
+            icon={FolderTree}
+            isLoading={metricsLoading}
+            error={categoriesError}
+            onRefresh={fetchMetrics}
+          />
+        </div>
+
+        {/* 3. RECENT ACTIVITY TABLE SECTION */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Recent Classroom Check-ins</h2>
+            <span className="text-xs text-slate-400">Real-time status updates</span>
+          </div>
+
+          <Card className="border border-slate-200 bg-white shadow-xs">
+            <CardContent className="p-0">
+              {metricsLoading ? (
+                <div className="p-6 space-y-4">
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <div key={idx} className="flex gap-4">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-4/5 rounded" />
+                        <Skeleton className="h-3 w-1/4 rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : recentInvSessions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Clock className="h-8 w-8 text-slate-300 mb-2" />
+                  <p className="text-xs font-semibold text-slate-500">No recent classroom check-ins available.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {recentInvSessions.map((session) => (
+                    <div key={session.id} className="p-4 hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                          <Users className="h-4 w-4 text-slate-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-900">
+                            {session.invigilatorName || "Invigilator"} checked into Room {session.classroom?.name || session.classroom?.classroomId || "N/A"}
+                          </p>
+                          <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                            <SchoolIcon className="h-3 w-3 text-slate-400" /> {session.school?.schoolName || "Unknown Center"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium sm:text-right">
+                        {session.checkedInAt ? new Date(session.checkedInAt).toLocaleString() : new Date(session.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
