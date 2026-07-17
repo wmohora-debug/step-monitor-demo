@@ -20,6 +20,7 @@ import {
   StatCard,
 } from "../../../src/components/ui";
 import { DashboardChart } from "../../../src/components/ui/DashboardCharts";
+import { cn } from "../../../src/core/utils/cn";
 import {
   CrudPageTemplate,
   CrudTable,
@@ -69,6 +70,7 @@ function ReportsPageContent() {
   const [schoolsData, setSchoolsData] = useState<SchoolResponseDto[]>([]);
   const [categoriesData, setCategoriesData] = useState<CategoryResponseDto[]>([]);
   const [categoriesList, setCategoriesList] = useState<CategoryResponseDto[]>([]);
+  const [allItemsList, setAllItemsList] = useState<ItemResponseDto[]>([]);
 
   // 3. Loading, counts, and filters
   const [isLoading, setIsLoading] = useState(true);
@@ -103,6 +105,16 @@ function ReportsPageContent() {
       setCategoriesList(response.items || []);
     } catch (err) {
       console.error("Failed to preload categories:", err);
+    }
+  }, []);
+
+  // Fetch preloaded items list for donut weighting chart
+  const preloadItems = useCallback(async () => {
+    try {
+      const response = await itemService.findAll({ page: 1, limit: 100 });
+      setAllItemsList(response.items || []);
+    } catch (err) {
+      console.error("Failed to preload items:", err);
     }
   }, []);
 
@@ -230,8 +242,9 @@ function ReportsPageContent() {
   // Sync data on change
   useEffect(() => {
     preloadCategories();
+    preloadItems();
     fetchGlobalStats();
-  }, [preloadCategories, fetchGlobalStats]);
+  }, [preloadCategories, preloadItems, fetchGlobalStats]);
 
   useEffect(() => {
     fetchReportData();
@@ -295,16 +308,16 @@ function ReportsPageContent() {
   }, [activeReport, itemsData, usersData, schoolsData, categoriesData]);
 
   const categoryDistributionPoints = useMemo(() => {
-    if (activeReport !== "items") return [];
     const counts: Record<string, number> = {};
-    itemsData.forEach((item) => {
+    const sourceList = allItemsList.length > 0 ? allItemsList : itemsData;
+    sourceList.forEach((item) => {
       const name = item.category?.name || "Uncategorized";
       counts[name] = (counts[name] || 0) + 1;
     });
 
     const parsed = Object.entries(counts).map(([label, value]) => ({ label, value }));
     return parsed.length === 0 ? [{ label: "No Items", value: 0 }] : parsed;
-  }, [activeReport, itemsData]);
+  }, [allItemsList, itemsData]);
 
   const statusDistributionPoints = useMemo(() => {
     return [
@@ -615,159 +628,143 @@ function ReportsPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Page Header Description */}
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-primary" /> {isDeptAdmin ? "Reports & Analytics" : "Reports & Analytics Console"}
-        </h1>
-        <p className="text-xs font-medium text-muted-foreground max-w-2xl leading-relaxed">
-          {isDeptAdmin
-            ? "Monitor registration trends, inventory category distributions, and classroom check-in activity."
-            : "Monitor registration trends, inventory category distributions, center activation summaries, and access clearance records across the network."}
-        </p>
+      {/* 1. Page Header Description & Selection Tabs */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-border/40 pb-5">
+        <div className="space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            Analytics Console
+          </span>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports & Analytics</h1>
+          <p className="text-sm text-muted-foreground">
+            {isDeptAdmin
+              ? "Monitor registration trends, inventory category distributions, and classroom check-in activity."
+              : "Monitor registration trends, inventory category distributions, center activation summaries, and access clearance records across the network."}
+          </p>
+        </div>
+
+        {/* Horizontal segment control tabs on the right side */}
+        <div className="flex items-center bg-secondary p-1 rounded-lg border border-border/40 shrink-0 self-start lg:self-center">
+          {!isDeptAdmin && (
+            <button
+              onClick={() => setActiveReport("users")}
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+                activeReport === "users"
+                  ? "bg-card text-foreground shadow-xs border border-border/20"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Users
+            </button>
+          )}
+          <button
+            onClick={() => setActiveReport("schools")}
+            className={cn(
+              "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+              activeReport === "schools"
+                ? "bg-card text-foreground shadow-xs border border-border/20"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Registered Centers
+          </button>
+          <button
+            onClick={() => setActiveReport("categories")}
+            className={cn(
+              "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+              activeReport === "categories"
+                ? "bg-card text-foreground shadow-xs border border-border/20"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Classifications
+          </button>
+          <button
+            onClick={() => setActiveReport("items")}
+            className={cn(
+              "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+              activeReport === "items"
+                ? "bg-card text-foreground shadow-xs border border-border/20"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Item Registry
+          </button>
+        </div>
       </div>
 
-      {/* 2. Interactive Report Selection Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Users Card */}
+      {/* 2. Compact Statistics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {!isDeptAdmin && (
-          <Card
-            onClick={() => setActiveReport("users")}
-            className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
-              activeReport === "users"
-                ? "border-primary bg-primary/[0.02] shadow-md"
-                : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
-            }`}
-          >
-            <CardContent className="p-5 flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Users Report
-                </span>
-                <h3 className="text-xl font-extrabold tracking-tight">
-                  {globalStats.users.toLocaleString()}
-                </h3>
-                <p className="text-[10px] font-semibold text-muted-foreground">
-                  Administrative Accounts
-                </p>
-              </div>
-              <div className={`p-2.5 rounded-xl ${activeReport === "users" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                <Users className="h-4.5 w-4.5" />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Users</span>
+              <h4 className="text-xl font-bold text-foreground">{globalStats.users.toLocaleString()}</h4>
+              <p className="text-[10px] text-muted-foreground">Administrative accounts</p>
+            </div>
+            <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
+              <Users className="h-4 w-4" />
+            </div>
+          </div>
         )}
-
-        {/* Schools Card */}
-        <Card
-          onClick={() => setActiveReport("schools")}
-          className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
-            activeReport === "schools"
-              ? "border-primary bg-primary/[0.02] shadow-xs"
-              : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
-          }`}
-        >
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500">
-                {isDeptAdmin ? "Schools" : "Schools Report"}
-              </span>
-              <h3 className="text-xl font-bold tracking-tight text-slate-900">
-                {globalStats.schools.toLocaleString()}
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                {isDeptAdmin ? "Registered centers" : "Center Registries Active"}
-              </p>
-            </div>
-            <div className={`p-2.5 rounded-lg ${activeReport === "schools" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-              <School className="h-4.5 w-4.5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Categories Card */}
-        <Card
-          onClick={() => setActiveReport("categories")}
-          className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
-            activeReport === "categories"
-              ? "border-primary bg-primary/[0.02] shadow-xs"
-              : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
-          }`}
-        >
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500">
-                {isDeptAdmin ? "Categories" : "Categories Report"}
-              </span>
-              <h3 className="text-xl font-bold tracking-tight text-slate-900">
-                {globalStats.categories.toLocaleString()}
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                {isDeptAdmin ? "Inventory classifications" : "Inventory Classifications"}
-              </p>
-            </div>
-            <div className={`p-2.5 rounded-lg ${activeReport === "categories" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-              <Layers className="h-4.5 w-4.5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Items Card */}
-        <Card
-          onClick={() => setActiveReport("items")}
-          className={`cursor-pointer transition-all duration-300 border hover:translate-y-[-2px] ${
-            activeReport === "items"
-              ? "border-primary bg-primary/[0.02] shadow-xs"
-              : "border-border/60 hover:border-primary/20 bg-card hover:bg-primary/[0.005]"
-          }`}
-        >
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500">
-                {isDeptAdmin ? "Inventory items" : "Inventory Report"}
-              </span>
-              <h3 className="text-xl font-bold tracking-tight text-slate-900">
-                {globalStats.items.toLocaleString()}
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                {isDeptAdmin ? "Trackable assets" : "Trackable Catalog Assets"}
-              </p>
-            </div>
-            <div className={`p-2.5 rounded-lg ${activeReport === "items" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-              <Package className="h-4.5 w-4.5" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Registered Centers</span>
+            <h4 className="text-xl font-bold text-foreground">{globalStats.schools.toLocaleString()}</h4>
+            <p className="text-[10px] text-muted-foreground">Active monitored schools</p>
+          </div>
+          <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
+            <School className="h-4 w-4" />
+          </div>
+        </div>
+        <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Classifications</span>
+            <h4 className="text-xl font-bold text-foreground">{globalStats.categories.toLocaleString()}</h4>
+            <p className="text-[10px] text-muted-foreground">Asset category groups</p>
+          </div>
+          <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
+            <Layers className="h-4 w-4" />
+          </div>
+        </div>
+        <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Catalog Inventory</span>
+            <h4 className="text-xl font-bold text-foreground">{globalStats.items.toLocaleString()}</h4>
+            <p className="text-[10px] text-muted-foreground">Trackable assets registry</p>
+          </div>
+          <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
+            <Package className="h-4 w-4" />
+          </div>
+        </div>
       </div>
 
       {/* 3. Filtering Toolbar */}
-      <Card className={`border border-border/50 shadow-sm ${isDeptAdmin ? "bg-white" : "bg-secondary/15 backdrop-blur-md"}`}>
-        <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-bold text-muted-foreground flex items-center gap-1.5 shrink-0 uppercase tracking-wider text-[10px]">
-              <Filter className="h-3.5 w-3.5" /> Filter Report parameters
-            </span>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-r border-border/40 pr-3 h-5">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" /> Filters
+          </span>
+          <FilterDropdown
+            label="Status"
+            selected={statusFilter as any}
+            onChange={(val) => setStatusFilter(val as any)}
+            options={[
+              { label: "Active Status", value: "active" },
+              { label: "Inactive Status", value: "inactive" },
+            ]}
+          />
+          {activeReport === "items" && (
             <FilterDropdown
-              label="Status"
-              selected={statusFilter as any}
-              onChange={(val) => setStatusFilter(val as any)}
-              options={[
-                { label: "Active Status", value: "active" },
-                { label: "Inactive Status", value: "inactive" },
-              ]}
+              label="Category"
+              selected={categoryFilter}
+              onChange={(val) => setCategoryFilter(val ? String(val) : null)}
+              options={categoriesList.map((c) => ({
+                label: c.name,
+                value: c.id,
+              }))}
             />
-            {activeReport === "items" && (
-              <FilterDropdown
-                label="Category"
-                selected={categoryFilter}
-                onChange={(val) => setCategoryFilter(val ? String(val) : null)}
-                options={categoriesList.map((c) => ({
-                  label: c.name,
-                  value: c.id,
-                }))}
-              />
-            )}
-          </div>
+          )}
           {(statusFilter || categoryFilter) && (
             <Button
               variant="ghost"
@@ -776,13 +773,13 @@ function ReportsPageContent() {
                 setStatusFilter(null);
                 setCategoryFilter(null);
               }}
-              className="h-8 text-[10px] font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 px-2.5 uppercase tracking-wide cursor-pointer"
+              className="h-7 text-[11px] font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 px-2 rounded-lg cursor-pointer"
             >
               Clear Filters
             </Button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 4. Graphical Charts Display Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -792,15 +789,17 @@ function ReportsPageContent() {
           data={registrationTrendPoints}
           title={`Registration Trend (${activeReport.charAt(0).toUpperCase() + activeReport.slice(1)})`}
           height={220}
+          className="bg-secondary/35 border border-border/45 rounded-xl shadow-sm p-5"
         />
 
         {/* Balance Chart (Pie/Donut representation) */}
-        {activeReport === "items" ? (
+        {activeReport === "items" || activeReport === "categories" ? (
           <DashboardChart
             type="donut"
             data={categoryDistributionPoints}
             title="Category Weighting Distribution"
             height={220}
+            className="bg-secondary/35 border border-border/45 rounded-xl shadow-sm p-5"
           />
         ) : (
           <DashboardChart
@@ -808,6 +807,7 @@ function ReportsPageContent() {
             data={statusDistributionPoints}
             title="Operational Activation Balance"
             height={220}
+            className="bg-secondary/35 border border-border/45 rounded-xl shadow-sm p-5"
           />
         )}
       </div>

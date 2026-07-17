@@ -45,7 +45,7 @@ export function Avatar({
         />
       ) : (
         <span className="flex h-full w-full items-center justify-center bg-secondary/80 text-foreground/80">
-          {fallback.substring(0, 2)}
+          {fallback.substring(0, 1)}
         </span>
       )}
     </div>

@@ -18,6 +18,7 @@ import {
   FolderTree,
   Package,
   Activity,
+  Image as ImageIcon,
   Database,
   ShieldCheck,
   RefreshCw,
@@ -31,6 +32,8 @@ import {
   ArrowDownRight,
   Lock,
   GraduationCap,
+  BarChart3,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "../../src/components/ui/Toast";
 import { DashboardChart } from "../../src/components/ui/DashboardCharts";
@@ -167,6 +170,7 @@ interface DeptMetricCardProps {
   isLoading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  accentType?: "blue" | "violet" | "amber";
 }
 
 const DeptMetricCard = React.memo(function DeptMetricCard({
@@ -177,10 +181,11 @@ const DeptMetricCard = React.memo(function DeptMetricCard({
   isLoading,
   error,
   onRefresh,
+  accentType = "blue",
 }: DeptMetricCardProps) {
   if (isLoading) {
     return (
-      <Card className="border border-slate-200 bg-white shadow-xs">
+      <Card className="border border-slate-100 bg-white shadow-xs rounded-xl">
         <CardContent className="p-5 space-y-2">
           <Skeleton className="h-4 w-1/3 rounded" />
           <Skeleton className="h-6 w-1/4 rounded" />
@@ -192,11 +197,11 @@ const DeptMetricCard = React.memo(function DeptMetricCard({
 
   if (error) {
     return (
-      <Card className="border border-red-200 bg-red-50/50 shadow-xs">
+      <Card className="border border-red-150 bg-red-50/30 shadow-xs rounded-xl">
         <CardContent className="p-5 flex flex-col justify-between min-h-[110px]">
           <div className="space-y-1 flex-1">
             <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">{title} Error</span>
-            <p className="text-[11px] text-muted-foreground line-clamp-2">{error}</p>
+            <p className="text-[11px] text-slate-500 line-clamp-2 font-medium">{error}</p>
           </div>
           <Button
             variant="outline"
@@ -211,15 +216,21 @@ const DeptMetricCard = React.memo(function DeptMetricCard({
     );
   }
 
+  const iconClasses = {
+    blue: "bg-blue-50/70 text-blue-600 border border-blue-100/50",
+    violet: "bg-violet-50/70 text-violet-600 border border-violet-100/50",
+    amber: "bg-amber-50/70 text-amber-600 border border-amber-100/50",
+  }[accentType];
+
   return (
-    <Card className="border border-slate-200 bg-white shadow-xs">
+    <Card className="border border-slate-100 bg-white shadow-sm rounded-xl">
       <CardContent className="p-5 flex items-center justify-between">
-        <div className="space-y-1.5">
-          <span className="text-xs font-semibold text-slate-500">{title}</span>
-          <h3 className="text-2xl font-bold text-slate-950 tracking-tight">{value.toLocaleString()}</h3>
-          <p className="text-xs text-slate-400">{description}</p>
+        <div className="space-y-1">
+          <span className="text-xs font-semibold text-slate-500 tracking-wide">{title}</span>
+          <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{value.toLocaleString()}</h3>
+          <p className="text-[11px] text-slate-400 font-medium">{description}</p>
         </div>
-        <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
+        <div className={cn("p-2.5 rounded-xl shrink-0 flex items-center justify-center", iconClasses)}>
           <Icon className="h-5 w-5" />
         </div>
       </CardContent>
@@ -465,20 +476,20 @@ export default function DashboardOverviewPage() {
 
   if (isDeptAdmin) {
     return (
-      <div className="space-y-8 animate-in fade-in duration-300">
+      <div className="space-y-6 animate-in fade-in duration-300">
         {/* 1. HEADER SECTION */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-xl font-bold text-slate-900">Overview</h1>
-            <p className="text-sm font-semibold text-slate-800">
-              Welcome back, {user?.firstName || "Administrator"}
-            </p>
-            <p className="text-xs text-slate-500">
-              Here is a summary of current departmental activity.
+            <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+              Operations Control Panel
+            </span>
+            <h1 className="text-3xl font-bold tracking-tight text-[#172033]">Overview</h1>
+            <p className="text-sm text-[#64748B]">
+              Welcome back, <span className="font-semibold text-slate-800">{user?.firstName || "Administrator"}</span>. Here is your departmental operations summary.
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded border border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[#64748B] bg-white border border-[#E8EAF0] px-3 py-2 rounded-lg shadow-sm">
               {formatDate(new Date())}
             </span>
             <Button
@@ -486,54 +497,90 @@ export default function DashboardOverviewPage() {
               size="sm"
               onClick={handleSyncMetrics}
               disabled={metricsLoading}
-              className="gap-2 h-9 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+              className="gap-2 h-9 rounded-lg border border-[#E8EAF0] bg-white hover:bg-slate-50 text-slate-700 font-medium shadow-sm transition-colors cursor-pointer"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", metricsLoading && "animate-spin")} />
+              <RefreshCw className={cn("h-3.5 w-3.5 text-slate-500", metricsLoading && "animate-spin")} />
               Sync Dashboard
             </Button>
           </div>
         </div>
 
-        {/* 2. SUMMARY CARDS GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <DeptMetricCard
-            title="Classroom Sessions"
-            value={invSessionsCount}
-            description="Total invigilation sessions logged"
-            icon={Activity}
-            isLoading={metricsLoading}
-            error={invSessionsError}
-            onRefresh={fetchMetrics}
-          />
-          <DeptMetricCard
-            title="Registered Centers"
-            value={schoolsCount}
-            description="Monitored educational centers"
-            icon={SchoolIcon}
-            isLoading={metricsLoading}
-            error={schoolsError}
-            onRefresh={fetchMetrics}
-          />
-          <DeptMetricCard
-            title="Asset Categories"
-            value={categoriesCount}
-            description="Inventory classifications"
-            icon={FolderTree}
-            isLoading={metricsLoading}
-            error={categoriesError}
-            onRefresh={fetchMetrics}
-          />
-        </div>
-
-        {/* 3. RECENT ACTIVITY TABLE SECTION */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Recent Classroom Check-ins</h2>
-            <span className="text-xs text-slate-400">Real-time status updates</span>
+        {/* 2. SUMMARY CARDS - UNIFIED STATISTICS PANEL */}
+        <div className="border border-[#E8EAF0] bg-white rounded-xl divide-y md:divide-y-0 md:divide-x divide-[#E8EAF0] grid grid-cols-1 md:grid-cols-3 overflow-hidden shadow-sm">
+          {/* Card 1: Classroom Sessions */}
+          <div className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Classroom Sessions</span>
+              {invSessionsError ? (
+                <div className="text-xs text-red-500 font-medium">Failed to load</div>
+              ) : metricsLoading ? (
+                <Skeleton className="h-8 w-16 rounded mt-1" />
+              ) : (
+                <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{invSessionsCount.toLocaleString()}</h3>
+              )}
+              <p className="text-[11px] text-[#64748B]">Total invigilation sessions logged</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
+              <Activity className="h-5 w-5" />
+            </div>
           </div>
 
-          <Card className="border border-slate-200 bg-white shadow-xs">
-            <CardContent className="p-0">
+          {/* Card 2: Registered Centers */}
+          <div className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Registered Centers</span>
+              {schoolsError ? (
+                <div className="text-xs text-red-500 font-medium">Failed to load</div>
+              ) : metricsLoading ? (
+                <Skeleton className="h-8 w-16 rounded mt-1" />
+              ) : (
+                <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{schoolsCount.toLocaleString()}</h3>
+              )}
+              <p className="text-[11px] text-[#64748B]">Monitored educational centers</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
+              <SchoolIcon className="h-5 w-5" />
+            </div>
+          </div>
+
+          {/* Card 3: Asset Categories */}
+          <div className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Asset Categories</span>
+              {categoriesError ? (
+                <div className="text-xs text-red-500 font-medium">Failed to load</div>
+              ) : metricsLoading ? (
+                <Skeleton className="h-8 w-16 rounded mt-1" />
+              ) : (
+                <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{categoriesCount.toLocaleString()}</h3>
+              )}
+              <p className="text-[11px] text-[#64748B]">Inventory classifications</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
+              <FolderTree className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. ASYMMETRIC MAIN WORKSPACE */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          
+          {/* LEFT COLUMN: Recent Classroom Check-ins (65-70%) */}
+          <div className="lg:col-span-2 border border-[#E8EAF0] bg-white rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4.5 border-b border-[#E8EAF0]">
+              <div className="space-y-0.5">
+                <h2 className="text-base font-semibold text-[#172033]">Recent Classroom Check-ins</h2>
+                <p className="text-xs text-[#64748B]">Latest invigilator activity across classrooms</p>
+              </div>
+              <Link
+                href="/dashboard/sessions"
+                className="text-xs font-semibold text-[#4F46E5] hover:text-[#3730a3] transition-colors flex items-center gap-1 group"
+              >
+                View logs <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            </div>
+
+            <div className="divide-y divide-[#E8EAF0]">
               {metricsLoading ? (
                 <div className="p-6 space-y-4">
                   {Array.from({ length: 3 }).map((_, idx) => (
@@ -547,36 +594,134 @@ export default function DashboardOverviewPage() {
                   ))}
                 </div>
               ) : recentInvSessions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Clock className="h-8 w-8 text-slate-300 mb-2" />
-                  <p className="text-xs font-semibold text-slate-500">No recent classroom check-ins available.</p>
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center min-h-[200px]">
+                  <div className="mx-auto w-10 h-10 rounded-full bg-slate-50 border border-slate-100 text-slate-400 flex items-center justify-center mb-3">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-[#172033]">No recent classroom check-ins</h3>
+                  <p className="text-xs text-[#64748B] max-w-sm mt-1">
+                    There are no invigilator check-ins logged within the active session week.
+                  </p>
+                  <Link href="/dashboard/sessions" className="text-xs font-semibold text-[#4F46E5] hover:underline mt-2">
+                    Review older scan logs →
+                  </Link>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
-                  {recentInvSessions.map((session) => (
-                    <div key={session.id} className="p-4 hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                          <Users className="h-4 w-4 text-slate-500" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-slate-900">
-                            {session.invigilatorName || "Invigilator"} checked into Room {session.classroom?.name || session.classroom?.classroomId || "N/A"}
-                          </p>
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <SchoolIcon className="h-3 w-3 text-slate-400" /> {session.school?.schoolName || "Unknown Center"}
-                          </p>
-                        </div>
+                recentInvSessions.map((session) => (
+                  <div key={session.id} className="px-6 py-4 hover:bg-slate-50/40 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 text-[#172033]">
+                        <Users className="h-4 w-4" />
                       </div>
-                      <span className="text-[11px] text-slate-400 font-medium sm:text-right">
-                        {session.checkedInAt ? new Date(session.checkedInAt).toLocaleString() : new Date(session.createdAt).toLocaleString()}
-                      </span>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-semibold text-[#172033]">
+                          {session.invigilatorName || "Invigilator"} checked into Room {session.classroom?.name || session.classroom?.classroomId || "N/A"}
+                        </p>
+                        <p className="text-[11px] text-[#64748B] flex items-center gap-1.5">
+                          <SchoolIcon className="h-3 w-3 text-slate-400" /> {session.school?.schoolName || "Unknown Center"}
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    <span className="text-xs text-[#64748B] font-medium sm:text-right shrink-0">
+                      {session.checkedInAt ? new Date(session.checkedInAt).toLocaleString() : new Date(session.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                ))
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Operations & Status (30-35%) */}
+          <div className="space-y-6">
+            
+            {/* Action panel */}
+            <div className="border border-[#E8EAF0] bg-white rounded-xl p-5 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-[#172033]">Operations Workspace</h3>
+                <p className="text-xs text-[#64748B] mt-0.5">Navigate to operations tools</p>
+              </div>
+              <div className="space-y-2">
+                <Link
+                  href="/dashboard/reports"
+                  className="flex items-center justify-between rounded-lg border border-[#E8EAF0] bg-white px-4 py-3 hover:border-[#4F46E5] hover:bg-[#F6F7FB]/50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded bg-indigo-50 text-[#4F46E5]">
+                      <BarChart3 className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-xs font-semibold text-[#172033]">View Reports</span>
+                      <span className="text-[10px] text-[#64748B]">Analytics & summaries</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#4F46E5] transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
+                <Link
+                  href="/dashboard/sessions"
+                  className="flex items-center justify-between rounded-lg border border-[#E8EAF0] bg-white px-4 py-3 hover:border-[#4F46E5] hover:bg-[#F6F7FB]/50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded bg-emerald-50 text-emerald-600">
+                      <Activity className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-xs font-semibold text-[#172033]">Activity Scan Logs</span>
+                      <span className="text-[10px] text-[#64748B]">Scans & check-ins</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#4F46E5] transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
+                <Link
+                  href="/dashboard/gallery"
+                  className="flex items-center justify-between rounded-lg border border-[#E8EAF0] bg-white px-4 py-3 hover:border-[#4F46E5] hover:bg-[#F6F7FB]/50 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded bg-amber-50 text-amber-600">
+                      <ImageIcon className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-xs font-semibold text-[#172033]">Gallery Workspace</span>
+                      <span className="text-[10px] text-[#64748B]">Verification media</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#4F46E5] transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Operational Status Section */}
+            <div className="border border-[#E8EAF0] bg-white rounded-xl p-5 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#64748B]">System Status</h3>
+                <p className="text-[11px] text-[#64748B]">Operations Gateway Status</p>
+              </div>
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "h-2 w-2 rounded-full animate-pulse",
+                      apiStatus === "offline" ? "bg-rose-500" : apiStatus === "degraded" ? "bg-amber-500" : "bg-emerald-500"
+                    )} />
+                    <span className="text-slate-700">API Gateway Status</span>
+                  </div>
+                  <span className="text-[#64748B] capitalize">{apiStatus}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="text-slate-700">Sync Latency</span>
+                  </div>
+                  <span className="text-[#172033] bg-slate-150 px-2 py-0.5 rounded font-mono text-[10px]">
+                    {latency ? `${latency}ms` : "Optimal"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </div>
     );

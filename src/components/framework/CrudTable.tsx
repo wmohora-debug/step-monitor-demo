@@ -73,6 +73,8 @@ export interface CrudTableProps<T> {
   onRefresh?: () => void;
   bulkActions?: BulkAction<T>[];
   rowActions?: (row: T) => React.ReactNode;
+  extraFilters?: React.ReactNode;
+  extraActions?: React.ReactNode;
 }
 
 export function CrudTable<T>({
@@ -100,6 +102,8 @@ export function CrudTable<T>({
   onRefresh,
   bulkActions = [],
   rowActions,
+  extraFilters,
+  extraActions,
 }: CrudTableProps<T>) {
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
@@ -137,7 +141,8 @@ export function CrudTable<T>({
     <div className="space-y-4 relative">
       {/* 1. TABLE TOP CONTROLS */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/10 p-3 rounded-xl border border-border/40">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {extraFilters}
           {onRefresh && (
             <Button
               variant="outline"
@@ -163,6 +168,7 @@ export function CrudTable<T>({
         </div>
 
         <div className="flex items-center gap-3">
+          {extraActions}
           {/* Column visibility dropdown */}
           <Dropdown
             align="right"

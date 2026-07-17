@@ -21,6 +21,7 @@ import {
   CrudPageTemplate,
   CrudTable,
   FilterDropdown,
+  PermissionGate,
 } from "../../../src/components/framework";
 import {
   QrCode,
@@ -37,6 +38,7 @@ import {
 import { useToast } from "../../../src/components/ui/Toast";
 import { useDebounce } from "../../../src/core/hooks";
 import { Modal } from "../../../src/components/ui/Modal";
+import { cn } from "../../../src/core/utils/cn";
 
 type LogTab = "scans" | "invigilation";
 
@@ -253,105 +255,117 @@ export default function SessionsLogPage() {
   const { user } = useAuth();
   const isDeptAdmin = user?.role?.slug === "admin";
 
+  const handleExportCsv = () => {
+    try {
+      let csvContent = "";
+      let filename = "";
+
+      if (activeTab === "scans") {
+        filename = "asset_scans_report.csv";
+        csvContent = "ID,Item Name,SKU,Operator,School,Scanned At\n" +
+          scanData.map(r => `"${r.id}","${r.item?.name || ''}","${r.item?.sku || ''}","${r.user?.firstName || ''} ${r.user?.lastName || ''}","${r.school?.schoolName || ''}","${new Date(r.scannedAt).toLocaleString()}"`).join("\n");
+      } else {
+        filename = "invigilation_checkins_report.csv";
+        csvContent = "ID,Invigilator,School,Classroom,Status,Checked In At\n" +
+          invData.map(r => `"${r.id}","${r.invigilatorName || ''}","${r.school?.schoolName || ''}","${r.classroom?.name || ''}","${r.sessionStatus || ''}","${new Date(r.checkedInAt).toLocaleString()}"`).join("\n");
+      }
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      success("CSV report exported successfully");
+    } catch (err) {
+      toastError("Failed to export CSV report");
+    }
+  };
+
   if (isDeptAdmin) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        {/* 1. Header */}
-        <div className="space-y-1">
-          <h1 className="text-xl font-bold text-slate-900">Activity Scan Logs</h1>
-          <p className="text-xs text-slate-500">
-            Review asset scans and invigilation check-in records.
-          </p>
-        </div>
-
-        {/* 2. Compact Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="border border-slate-200 bg-white p-5 rounded-lg shadow-xs flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500">Total Asset Scans</span>
-              <h3 className="text-xl font-bold text-slate-900">{scanTotal.toLocaleString()}</h3>
-              <p className="text-[11px] text-slate-400">Items checked in system wide</p>
-            </div>
-            <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
-              <QrCode className="h-5 w-5 text-blue-600" />
-            </div>
+        {/* 1. Page Header Description & Selection Tabs */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-[#E8EAF0] pb-5">
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+              Operations Logs
+            </span>
+            <h1 className="text-3xl font-bold tracking-tight text-[#172033]">
+              Activity Scan Logs
+            </h1>
+            <p className="text-sm text-[#64748B]">
+              Review real-time asset scans and invigilator check-in activities across exam centers.
+            </p>
           </div>
 
-          <div className="border border-slate-200 bg-white p-5 rounded-lg shadow-xs flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500">Total Check-Ins</span>
-              <h3 className="text-xl font-bold text-slate-900">{invTotal.toLocaleString()}</h3>
-              <p className="text-[11px] text-slate-400">Invigilator sessions logged</p>
-            </div>
-            <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
-              <ClipboardList className="h-5 w-5 text-emerald-600" />
-            </div>
-          </div>
-
-          <div className="border border-slate-200 bg-white p-5 rounded-lg shadow-xs flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-slate-500">Monitoring Status</span>
-              <h3 className="text-xl font-bold text-slate-900">Active</h3>
-              <p className="text-[11px] text-slate-400">All logs fully synchronized</p>
-            </div>
-            <div className="text-slate-400 p-2.5 bg-slate-50 rounded-lg shrink-0">
-              <RefreshCw className="h-5 w-5 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Filter/Control Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-2">
-          {/* Tab Navigation */}
-          <div className="flex gap-4">
+          {/* Clean horizontal segment control tabs on the right side */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shrink-0 self-start lg:self-center">
             <button
               onClick={() => handleTabChange("scans")}
-              className={`pb-2 px-1 text-xs font-semibold tracking-wide transition-all cursor-pointer border-b-2 ${
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
                 activeTab === "scans"
-                  ? "border-blue-600 text-blue-600 font-bold"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
+                  ? "bg-white text-[#172033] shadow-xs"
+                  : "text-[#64748B] hover:text-[#172033]"
+              )}
             >
               Asset Scan Logs
             </button>
             <button
               onClick={() => handleTabChange("invigilation")}
-              className={`pb-2 px-1 text-xs font-semibold tracking-wide transition-all cursor-pointer border-b-2 ${
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
                 activeTab === "invigilation"
-                  ? "border-blue-600 text-blue-600 font-bold"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
+                  ? "bg-white text-[#172033] shadow-xs"
+                  : "text-[#64748B] hover:text-[#172033]"
+              )}
             >
-              Invigilation Check-ins
+              Classroom Check-ins
             </button>
-          </div>
-
-          {/* School Selector / Search */}
-          <div className="flex items-center gap-3 self-end sm:self-center">
-            {activeTab === "scans" && schools.length > 0 && (
-              <div className="w-64">
-                <FilterDropdown
-                  label="Filter School"
-                  selected={selectedSchoolId}
-                  onChange={(val) => setSelectedSchoolId(String(val || ""))}
-                  options={schools.map((s) => ({ label: s.schoolName, value: s.id }))}
-                />
-              </div>
-            )}
-            {activeTab === "invigilation" && (
-              <div className="w-64">
-                <Input
-                  placeholder="Search invigilator..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 text-xs rounded border-slate-200 bg-white"
-                />
-              </div>
-            )}
           </div>
         </div>
 
-        {/* 4. Table */}
+        {/* 2. Compact Summary Statistics Strip */}
+        <div className="border border-[#E8EAF0] bg-white rounded-xl divide-y md:divide-y-0 md:divide-x divide-[#E8EAF0] grid grid-cols-1 md:grid-cols-3 overflow-hidden shadow-sm">
+          <div className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Total Asset Scans</span>
+              <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{scanTotal.toLocaleString()}</h3>
+              <p className="text-[11px] text-[#64748B]">Items checked in system wide</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
+              <QrCode className="h-5 w-5" />
+            </div>
+          </div>
+
+          <div className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Total Check-Ins</span>
+              <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{invTotal.toLocaleString()}</h3>
+              <p className="text-[11px] text-[#64748B]">Invigilator sessions logged</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
+              <ClipboardList className="h-5 w-5" />
+            </div>
+          </div>
+
+          <div className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Monitoring Status</span>
+              <h3 className="text-3xl font-bold text-emerald-600 tracking-tight">Active</h3>
+              <p className="text-[11px] text-[#64748B]">All logs fully synchronized</p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-emerald-500">
+              <RefreshCw className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Table view */}
         {activeTab === "scans" ? (
           <CrudTable
             columns={scanColumns}
@@ -365,12 +379,48 @@ export default function SessionsLogPage() {
             totalPages={Math.ceil(scanTotal / scanLimit)}
             onPageChange={setScanPage}
             onRefresh={fetchScanSessions}
+            extraFilters={
+              <div className="flex items-center gap-2 flex-wrap">
+                {schools.length > 0 && (
+                  <div className="w-52">
+                    <FilterDropdown
+                      label="Filter School"
+                      selected={selectedSchoolId}
+                      onChange={(val) => setSelectedSchoolId(String(val || ""))}
+                      options={schools.map((s) => ({ label: s.schoolName, value: s.id }))}
+                    />
+                  </div>
+                )}
+                {selectedSchoolId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedSchoolId("")}
+                    className="h-8 text-xs font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 px-2.5 rounded-lg cursor-pointer"
+                  >
+                    Clear Filter
+                  </Button>
+                )}
+              </div>
+            }
+            extraActions={
+              <PermissionGate permission="sessions.export">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  className="h-9 text-xs font-semibold gap-2 border border-[#E8EAF0] bg-white hover:bg-slate-50 text-slate-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-slate-500" /> Export CSV
+                </Button>
+              </PermissionGate>
+            }
             rowActions={(row) => (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleOpenScanDetails(row)}
-                className="w-full justify-start gap-2 text-xs font-semibold px-2"
+                className="w-full justify-start gap-2 text-xs font-semibold px-2 cursor-pointer"
               >
                 <Eye className="h-3.5 w-3.5 text-muted-foreground" /> View Log Details
               </Button>
@@ -389,12 +439,47 @@ export default function SessionsLogPage() {
             totalPages={Math.ceil(invTotal / invLimit)}
             onPageChange={setInvPage}
             onRefresh={fetchInvigilation}
+            extraFilters={
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative w-52">
+                  <Input
+                    placeholder="Search invigilator..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-9 text-xs rounded-lg border-slate-200 bg-white pr-8"
+                  />
+                  <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                </div>
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchQuery("")}
+                    className="h-8 text-xs font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 px-2.5 rounded-lg cursor-pointer"
+                  >
+                    Clear Filter
+                  </Button>
+                )}
+              </div>
+            }
+            extraActions={
+              <PermissionGate permission="sessions.export">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  className="h-9 text-xs font-semibold gap-2 border border-[#E8EAF0] bg-white hover:bg-slate-50 text-slate-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-slate-500" /> Export CSV
+                </Button>
+              </PermissionGate>
+            }
             rowActions={(row) => (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleOpenInvDetails(row)}
-                className="w-full justify-start gap-2 text-xs font-semibold px-2"
+                className="w-full justify-start gap-2 text-xs font-semibold px-2 cursor-pointer"
               >
                 <Eye className="h-3.5 w-3.5 text-muted-foreground" /> View Log Details
               </Button>
@@ -410,71 +495,71 @@ export default function SessionsLogPage() {
             size="md"
             title="Activity Log Details"
             footer={
-              <Button variant="outline" size="sm" onClick={() => setIsDetailOpen(false)}>
+              <Button variant="outline" size="sm" onClick={() => setIsDetailOpen(false)} className="cursor-pointer">
                 Close
               </Button>
             }
           >
             {selectedScan && (
               <div className="space-y-4 py-2">
-                <div className="bg-secondary/35 p-4 rounded-xl border border-border/40 text-center">
-                  <QrCode className="h-10 w-10 text-primary mx-auto mb-2" />
-                  <h4 className="text-xs font-black text-foreground uppercase tracking-wide">Scanned Item</h4>
-                  <p className="text-sm font-extrabold text-primary">{selectedScan.item?.name}</p>
-                  <p className="text-[10px] font-mono text-muted-foreground">SKU: {selectedScan.item?.sku || "N/A"}</p>
+                <div className="bg-slate-50 p-4 rounded-xl border border-[#E8EAF0] text-center">
+                  <QrCode className="h-10 w-10 text-[#4F46E5] mx-auto mb-2" />
+                  <h4 className="text-xs font-bold text-[#172033] uppercase tracking-wide">Scanned Item</h4>
+                  <p className="text-sm font-bold text-[#4F46E5]">{selectedScan.item?.name}</p>
+                  <p className="text-[10px] font-mono text-[#64748B]">SKU: {selectedScan.item?.sku || "N/A"}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-muted-foreground">
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-[#64748B]">
                   <div className="flex flex-col">
                     <span>Operator</span>
-                    <span className="font-bold text-foreground mt-0.5">{selectedScan.user?.name || `${selectedScan.user?.firstName} ${selectedScan.user?.lastName}`}</span>
-                    <span className="text-[10px] text-muted-foreground">{selectedScan.user?.email}</span>
+                    <span className="font-bold text-[#172033] mt-0.5">{selectedScan.user?.name || `${selectedScan.user?.firstName} ${selectedScan.user?.lastName}`}</span>
+                    <span className="text-[10px] text-[#64748B] font-medium">{selectedScan.user?.email}</span>
                   </div>
                   <div className="flex flex-col">
                     <span>School Location</span>
-                    <span className="font-bold text-foreground mt-0.5">{selectedScan.school?.schoolName}</span>
-                    <span className="text-[10px] text-muted-foreground">Code: {selectedScan.school?.schoolId}</span>
+                    <span className="font-bold text-[#172033] mt-0.5">{selectedScan.school?.schoolName}</span>
+                    <span className="text-[10px] text-[#64748B] font-medium">Code: {selectedScan.school?.schoolId}</span>
                   </div>
                 </div>
 
-                <div className="border-t border-border/40 pt-3 flex justify-between text-[10px] font-bold text-muted-foreground">
+                <div className="border-t border-[#E8EAF0] pt-3 flex justify-between text-xs font-semibold text-[#64748B]">
                   <span>Scanned At Time:</span>
-                  <span className="text-foreground">{new Date(selectedScan.scannedAt).toLocaleString()}</span>
+                  <span className="text-[#172033]">{new Date(selectedScan.scannedAt).toLocaleString()}</span>
                 </div>
               </div>
             )}
 
             {selectedInv && (
               <div className="space-y-4 py-2">
-                <div className="bg-secondary/35 p-4 rounded-xl border border-border/40 text-center">
-                  <User className="h-10 w-10 text-primary mx-auto mb-2" />
-                  <h4 className="text-xs font-black text-foreground uppercase tracking-wide">Invigilator Check-In</h4>
-                  <p className="text-sm font-extrabold text-primary">{selectedInv.invigilatorName}</p>
-                  <p className="text-[10px] font-mono text-muted-foreground">{selectedInv.phoneNumber || "No phone listed"}</p>
+                <div className="bg-slate-50 p-4 rounded-xl border border-[#E8EAF0] text-center">
+                  <User className="h-10 w-10 text-[#4F46E5] mx-auto mb-2" />
+                  <h4 className="text-xs font-bold text-[#172033] uppercase tracking-wide">Invigilator Check-In</h4>
+                  <p className="text-sm font-bold text-[#4F46E5]">{selectedInv.invigilatorName}</p>
+                  <p className="text-[10px] font-mono text-[#64748B]">{selectedInv.phoneNumber || "No phone listed"}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-muted-foreground">
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-[#64748B]">
                   <div className="flex flex-col">
                     <span>School Venue</span>
-                    <span className="font-bold text-foreground mt-0.5">{selectedInv.school?.schoolName}</span>
-                    <span className="text-[10px] text-muted-foreground">Code: {selectedInv.school?.schoolId}</span>
+                    <span className="font-bold text-[#172033] mt-0.5">{selectedInv.school?.schoolName}</span>
+                    <span className="text-[10px] text-[#64748B] font-medium">Code: {selectedInv.school?.schoolId}</span>
                   </div>
                   <div className="flex flex-col">
                     <span>Classroom / Room</span>
-                    <span className="font-bold text-foreground mt-0.5">{selectedInv.classroom?.name}</span>
-                    <span className="text-[10px] text-muted-foreground">ID: {selectedInv.classroom?.classroomId}</span>
+                    <span className="font-bold text-[#172033] mt-0.5">{selectedInv.classroom?.name}</span>
+                    <span className="text-[10px] text-[#64748B] font-medium">ID: {selectedInv.classroom?.classroomId}</span>
                   </div>
                 </div>
 
-                <div className="border-t border-border/40 pt-3 flex justify-between text-[10px] font-bold text-muted-foreground">
+                <div className="border-t border-[#E8EAF0] pt-3 flex justify-between text-xs font-semibold text-[#64748B] items-center">
                   <span>Session Status:</span>
                   <Badge variant={selectedInv.sessionStatus === "CHECKED_IN" ? "success" : "secondary"}>
                     {selectedInv.sessionStatus}
                   </Badge>
                 </div>
-                <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                <div className="flex justify-between text-xs font-semibold text-[#64748B]">
                   <span>Checked-in At Time:</span>
-                  <span className="text-foreground">{new Date(selectedInv.checkedInAt).toLocaleString()}</span>
+                  <span className="text-[#172033]">{new Date(selectedInv.checkedInAt).toLocaleString()}</span>
                 </div>
               </div>
             )}

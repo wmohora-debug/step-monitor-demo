@@ -86,6 +86,9 @@ function ItemsPageContent() {
   // 2. Form/Action Modals state
   const [modalMode, setModalMode] = useState<"create" | "edit" | "view" | null>(null);
   const [selectedItem, setSelectedItem] = useState<ItemResponseDto | null>(null);
+  const [detailQrUrl, setDetailQrUrl] = useState<string | null>(null);
+  const [isQrLoading, setIsQrLoading] = useState<boolean>(false);
+  const [qrError, setQrError] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRegeneratingQr, setIsRegeneratingQr] = useState(false);
@@ -230,9 +233,81 @@ function ItemsPageContent() {
     setModalMode("edit");
   };
 
-  const handleOpenView = (item: ItemResponseDto) => {
+  // Cleanup object URLs to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      setDetailQrUrl((prev) => {
+        if (prev && prev.startsWith("blob:")) {
+          window.URL.revokeObjectURL(prev);
+        }
+        return null;
+      });
+    };
+  }, []);
+
+  // Cleanup when modalMode changes from view
+  useEffect(() => {
+    if (modalMode !== "view") {
+      setDetailQrUrl((prev) => {
+        if (prev && prev.startsWith("blob:")) {
+          window.URL.revokeObjectURL(prev);
+        }
+        return null;
+      });
+      setIsQrLoading(false);
+      setQrError(false);
+    }
+  }, [modalMode]);
+
+  const handleOpenView = async (item: ItemResponseDto) => {
+    // Preserve the list QR code initially
+    setDetailQrUrl(item.qrCode);
     setSelectedItem(item);
     setModalMode("view");
+    setIsQrLoading(false);
+    setQrError(false);
+
+    try {
+      const detailed = await itemService.findOne(item.id);
+      setSelectedItem(detailed);
+
+      // If the details API returns a valid qrCode, use it
+      if (detailed.qrCode) {
+        setDetailQrUrl((prev) => {
+          if (prev && prev.startsWith("blob:")) {
+            window.URL.revokeObjectURL(prev);
+          }
+          return detailed.qrCode;
+        });
+      } else {
+        // Otherwise, fetch the QR code blob from the dedicated endpoint
+        setIsQrLoading(true);
+        try {
+          const blob = await itemService.getQrBlob(item.id);
+          const url = window.URL.createObjectURL(blob);
+          setDetailQrUrl((prev) => {
+            if (prev && prev.startsWith("blob:") && prev !== url) {
+              window.URL.revokeObjectURL(prev);
+            }
+            return url;
+          });
+        } catch (qrErr) {
+          console.error("Failed to load QR code blob:", qrErr);
+          setQrError(true);
+          setDetailQrUrl((prev) => {
+            if (prev && prev.startsWith("blob:")) {
+              window.URL.revokeObjectURL(prev);
+            }
+            return null;
+          });
+        } finally {
+          setIsQrLoading(false);
+        }
+      }
+    } catch (err: any) {
+      console.error("Failed to load item details:", err);
+      toastError(err.message || "Failed to load authoritative item details.");
+    }
   };
 
   const handleOpenDelete = (item: ItemResponseDto) => {
@@ -280,9 +355,10 @@ function ItemsPageContent() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      if (selectedItem.qrCode) {
+      const fallbackUrl = detailQrUrl || selectedItem.qrCode;
+      if (fallbackUrl) {
         const link = document.createElement("a");
-        link.href = selectedItem.qrCode;
+        link.href = fallbackUrl;
         link.download = `qrcode-${selectedItem.slug}.png`;
         link.click();
       }
@@ -297,6 +373,40 @@ function ItemsPageContent() {
       setSelectedItem(updated);
       setData((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       success("Item QR Code successfully regenerated.", "QR Synchronized");
+
+      // Update detailQrUrl after regeneration
+      if (updated.qrCode) {
+        setDetailQrUrl((prev) => {
+          if (prev && prev.startsWith("blob:")) {
+            window.URL.revokeObjectURL(prev);
+          }
+          return updated.qrCode;
+        });
+      } else {
+        // Fetch new QR blob
+        setIsQrLoading(true);
+        try {
+          const blob = await itemService.getQrBlob(updated.id);
+          const url = window.URL.createObjectURL(blob);
+          setDetailQrUrl((prev) => {
+            if (prev && prev.startsWith("blob:") && prev !== url) {
+              window.URL.revokeObjectURL(prev);
+            }
+            return url;
+          });
+        } catch (qrErr) {
+          console.error("Failed to load regenerated QR code blob:", qrErr);
+          setQrError(true);
+          setDetailQrUrl((prev) => {
+            if (prev && prev.startsWith("blob:")) {
+              window.URL.revokeObjectURL(prev);
+            }
+            return null;
+          });
+        } finally {
+          setIsQrLoading(false);
+        }
+      }
     } catch (err: any) {
       toastError(err.message || "Failed to regenerate QR code.", "Action Failed");
     } finally {
@@ -834,9 +944,14 @@ function ItemsPageContent() {
                 <span className="absolute top-2 left-2 text-[9px] font-bold text-muted-foreground bg-secondary/80 px-1.5 py-0.5 rounded uppercase">
                   System QR Code
                 </span>
-                {selectedItem.qrCode ? (
+                {isQrLoading ? (
+                  <div className="flex flex-col items-center justify-center p-4">
+                    <RefreshCw className="h-6 w-6 text-primary animate-spin mb-2" />
+                    <span className="text-[10px] font-semibold text-muted-foreground">Loading QR Code...</span>
+                  </div>
+                ) : detailQrUrl ? (
                   <div className="flex flex-col items-center">
-                    <img src={selectedItem.qrCode} alt="Item QR Code" className="h-[120px] w-[120px] object-contain" />
+                    <img src={detailQrUrl} alt="Item QR Code" className="h-[120px] w-[120px] object-contain" />
                     <div className="flex gap-1.5 mt-1">
                       <Button
                         variant="ghost"
@@ -863,7 +978,9 @@ function ItemsPageContent() {
                 ) : (
                   <div className="flex flex-col items-center text-center p-4">
                     <QrCode className="h-10 w-10 text-muted-foreground/50 mb-2" />
-                    <span className="text-[10px] font-semibold text-muted-foreground">QR not generated</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      {qrError ? "Failed to load QR code" : "QR not generated"}
+                    </span>
                   </div>
                 )}
               </div>
