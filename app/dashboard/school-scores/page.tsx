@@ -45,11 +45,16 @@ import {
 import { useToast } from "../../../src/components/ui/Toast";
 import { useSelection, useDebounce } from "../../../src/core/hooks";
 import { Modal } from "../../../src/components/ui/Modal";
+import { useAuth } from "../../../src/core/context/AuthContext";
 
 function SchoolScoresPageContent() {
+  const { user } = useAuth();
   const { success, error: toastError, warning } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  const role = user?.role?.slug?.toLowerCase();
+  const isSuper = role === "superadmin" || role === "super_admin" || user?.email === "superstep@yopmail.com";
 
   // 1. Table & Data states
   const [data, setData] = useState<SchoolScoreResponseDto[]>([]);
@@ -424,11 +429,11 @@ function SchoolScoresPageContent() {
       <CrudPageTemplate
         title="School Scores"
         description="Monitor, evaluate, and manage performance ratings, quality scores, and compliance grades for educational centers."
-        primaryAction={{
+        primaryAction={isSuper ? {
           label: "Register Scorecard",
           onClick: handleOpenCreate,
           icon: Plus,
-        }}
+        } : undefined}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search by school name or code..."
@@ -442,9 +447,9 @@ function SchoolScoresPageContent() {
           totalPages={Math.ceil(total / limit)}
           onPageChange={setPage}
           isLoading={isLoading}
-          selectedIds={selectedIds}
-          onToggleSelection={toggleSelection}
-          onToggleAll={toggleAll}
+          selectedIds={isSuper ? selectedIds : undefined}
+          onToggleSelection={isSuper ? toggleSelection : undefined}
+          onToggleAll={isSuper ? toggleAll : undefined}
           rowActions={(row) => (
             <>
               <Button
@@ -477,13 +482,13 @@ function SchoolScoresPageContent() {
               </PermissionGate>
             </>
           )}
-          bulkActions={[
+          bulkActions={isSuper ? [
             {
               label: "Delete Selected",
               onClick: handleBulkDelete,
               variant: "destructive",
             },
-          ]}
+          ] : []}
         />
       </CrudPageTemplate>
 

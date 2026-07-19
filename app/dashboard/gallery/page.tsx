@@ -102,6 +102,7 @@ export default function GalleryPage() {
   // S3 Presigned URLs mapping state
   const [presignedUrls, setPresignedUrls] = useState<Record<string, string>>({});
   const [resolvingUrls, setResolvingUrls] = useState<Record<string, boolean>>({});
+  const [imageLoadErrors, setImageLoadErrors] = useState<Record<string, boolean>>({});
 
   // Batch resolve S3 URIs to presigned URLs
   const resolveS3Uris = useCallback(async (urisToResolve: string[]) => {
@@ -799,12 +800,24 @@ export default function GalleryPage() {
 
                 {/* Main Selected Image */}
                 <div className="aspect-[16/9] w-full rounded-xl bg-slate-950 overflow-hidden relative border border-border/30 flex items-center justify-center">
-                  {!isUrlResolving(detailedItem.images[activeImageIndex]) ? (
+                  {imageLoadErrors[detailedItem.images[activeImageIndex]] ? (
+                    <div className="flex flex-col items-center justify-center text-center p-4">
+                      <AlertCircle className="h-8 w-8 text-rose-500 mb-2 animate-pulse" />
+                      <span className="text-xs font-bold text-rose-400">Failed to load S3 Asset</span>
+                      <span className="text-[10px] text-muted-foreground mt-1 max-w-xs px-4">
+                        The signed URL is unauthorized or has expired. Verify your AWS S3 environment variables on the production server.
+                      </span>
+                    </div>
+                  ) : !isUrlResolving(detailedItem.images[activeImageIndex]) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={getDisplayUrl(detailedItem.images[activeImageIndex])}
                       alt={`${detailedItem.title} - Active`}
                       className="w-full h-full object-contain"
+                      onError={() => {
+                        const currentUri = detailedItem.images[activeImageIndex];
+                        setImageLoadErrors((prev) => ({ ...prev, [currentUri]: true }));
+                      }}
                     />
                   ) : (
                     <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
@@ -812,7 +825,7 @@ export default function GalleryPage() {
                     </div>
                   )}
                   
-                  {!isUrlResolving(detailedItem.images[activeImageIndex]) && getDisplayUrl(detailedItem.images[activeImageIndex]) && (
+                  {!imageLoadErrors[detailedItem.images[activeImageIndex]] && !isUrlResolving(detailedItem.images[activeImageIndex]) && getDisplayUrl(detailedItem.images[activeImageIndex]) && (
                     <a
                       href={getDisplayUrl(detailedItem.images[activeImageIndex])}
                       target="_blank"

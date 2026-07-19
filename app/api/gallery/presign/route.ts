@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { generatePresignedUrl } from "@/src/core/utils/s3";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
     // 1. Authenticate user via cookies
@@ -11,7 +13,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Parse request body
+    // 2. Validate AWS S3 configuration
+    const accessKey = process.env.AWS_ACCESS_KEY_ID;
+    const secretKey = process.env.AWS_SECRET_ACCESS_KEY;
+    const region = process.env.AWS_REGION;
+    const bucket = process.env.AWS_S3_BUCKET;
+
+    if (!accessKey || !secretKey || !region || !bucket) {
+      const missing = [];
+      if (!accessKey) missing.push("AWS_ACCESS_KEY_ID");
+      if (!secretKey) missing.push("AWS_SECRET_ACCESS_KEY");
+      if (!region) missing.push("AWS_REGION");
+      if (!bucket) missing.push("AWS_S3_BUCKET");
+      return NextResponse.json(
+        { error: `AWS S3 server configuration is incomplete. Missing environment variable(s): ${missing.join(", ")}` },
+        { status: 500 }
+      );
+    }
+
+    // 3. Parse request body
     const body = await request.json();
     const { uri, uris } = body;
 
