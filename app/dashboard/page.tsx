@@ -666,35 +666,6 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
 
-            {/* Operational Status Section */}
-            <div className="border border-[#E8EAF0] bg-white rounded-xl p-5 shadow-sm space-y-4">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#64748B]">System Status</h3>
-                <p className="text-[11px] text-[#64748B]">Operations Gateway Status</p>
-              </div>
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "h-2 w-2 rounded-full animate-pulse",
-                      apiStatus === "offline" ? "bg-rose-500" : apiStatus === "degraded" ? "bg-amber-500" : "bg-emerald-500"
-                    )} />
-                    <span className="text-slate-700">API Gateway Status</span>
-                  </div>
-                  <span className="text-[#64748B] capitalize">{apiStatus}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <div className="flex items-center gap-2">
-                    <Database className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="text-slate-700">Sync Latency</span>
-                  </div>
-                  <span className="text-[#172033] bg-slate-150 px-2 py-0.5 rounded font-mono text-[10px]">
-                    {latency ? `${latency}ms` : "Optimal"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
           </div>
 
         </div>
