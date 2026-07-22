@@ -130,7 +130,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           items: [
             { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
             { name: "Reports & Analytics", href: "/dashboard/reports", icon: BarChart3 },
-            { name: "Activity Scan Logs", href: "/dashboard/sessions", icon: Activity },
             { name: "School Scores", href: "/dashboard/school-scores", icon: Trophy },
             { name: "Gallery", href: "/dashboard/gallery", icon: Image },
           ],
@@ -156,7 +155,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const isAllowed =
         pathname === "/dashboard" ||
         pathname.startsWith("/dashboard/reports") ||
-        pathname.startsWith("/dashboard/sessions") ||
         pathname.startsWith("/dashboard/school-scores") ||
         pathname.startsWith("/dashboard/gallery");
 

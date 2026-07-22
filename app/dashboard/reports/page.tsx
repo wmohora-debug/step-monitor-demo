@@ -62,7 +62,7 @@ function ReportsPageContent() {
   const isDeptAdmin = role === "admin";
 
   // 1. Navigation / Selection State
-  const [activeReport, setActiveReport] = useState<ReportType>("items");
+  const [activeReport, setActiveReport] = useState<ReportType>(isDeptAdmin ? "schools" : "items");
 
   // 2. Data Lists State for Drill Down
   const [itemsData, setItemsData] = useState<ItemResponseDto[]>([]);
@@ -261,8 +261,8 @@ function ReportsPageContent() {
   useEffect(() => {
     const type = searchParams.get("type") as ReportType;
     if (type && ["users", "schools", "categories", "items"].includes(type)) {
-      if (type === "users" && isDeptAdmin) {
-        setActiveReport("items");
+      if (isDeptAdmin) {
+        setActiveReport("schools");
       } else {
         setActiveReport(type);
       }
@@ -272,8 +272,8 @@ function ReportsPageContent() {
 
   // Protective role check for active report state
   useEffect(() => {
-    if (isDeptAdmin && activeReport === "users") {
-      setActiveReport("items");
+    if (isDeptAdmin && activeReport !== "schools") {
+      setActiveReport("schools");
     }
   }, [activeReport, isDeptAdmin]);
 
@@ -355,18 +355,29 @@ function ReportsPageContent() {
       ]);
       triggerCsvDownload("users_report.csv", headers, rows);
     } else if (activeReport === "schools") {
-      const headers = ["School ID", "School Code", "School Name", "Email Address", "City", "State", "Status", "Registration Date"];
-      const rows = schoolsData.map(s => [
-        s.id,
-        s.schoolId,
-        s.schoolName,
-        s.email || "",
-        s.city || "",
-        s.state || "",
-        s.isActive ? "Active" : "Inactive",
-        s.createdAt
-      ]);
-      triggerCsvDownload("schools_report.csv", headers, rows);
+      if (isDeptAdmin) {
+        const headers = ["School Name", "School ID", "Registered Date", "Status"];
+        const rows = schoolsData.map(s => [
+          s.schoolName,
+          s.schoolId,
+          s.createdAt,
+          s.isActive ? "Active" : "Inactive"
+        ]);
+        triggerCsvDownload("schools_report.csv", headers, rows);
+      } else {
+        const headers = ["School ID", "School Code", "School Name", "Email Address", "City", "State", "Status", "Registration Date"];
+        const rows = schoolsData.map(s => [
+          s.id,
+          s.schoolId,
+          s.schoolName,
+          s.email || "",
+          s.city || "",
+          s.state || "",
+          s.isActive ? "Active" : "Inactive",
+          s.createdAt
+        ]);
+        triggerCsvDownload("schools_report.csv", headers, rows);
+      }
     } else if (activeReport === "categories") {
       const headers = ["Category ID", "Category Name", "Slug", "Order Weight", "Status", "Creation Date"];
       const rows = categoriesData.map(c => [
@@ -521,6 +532,47 @@ function ReportsPageContent() {
     }
 
     if (activeReport === "schools") {
+      if (isDeptAdmin) {
+        return [
+          {
+            id: "schoolName",
+            header: "School Name",
+            sortable: true,
+            cell: (row: SchoolResponseDto) => (
+              <span className="font-bold text-foreground text-xs leading-none">{row.schoolName}</span>
+            ),
+          },
+          {
+            id: "schoolId",
+            header: "School ID",
+            sortable: true,
+            cell: (row: SchoolResponseDto) => (
+              <span className="text-xs font-mono font-bold text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded border border-border/20">
+                {row.schoolId}
+              </span>
+            ),
+          },
+          {
+            id: "createdAt",
+            header: "Registered Date",
+            sortable: true,
+            cell: (row: SchoolResponseDto) => (
+              <span className="text-xs font-semibold text-muted-foreground">
+                {new Date(row.createdAt).toLocaleDateString()}
+              </span>
+            ),
+          },
+          {
+            id: "isActive",
+            header: "Status",
+            sortable: true,
+            cell: (row: SchoolResponseDto) => (
+              <StatusBadge status={row.isActive ? "active" : "inactive"} />
+            ),
+          },
+        ];
+      }
+
       return [
         {
           id: "schoolId",
@@ -637,7 +689,7 @@ function ReportsPageContent() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports & Analytics</h1>
           <p className="text-sm text-muted-foreground">
             {isDeptAdmin
-              ? "Monitor registration trends, inventory category distributions, and classroom check-in activity."
+              ? "Monitor registration trends and Monitored Centers activation status across the network."
               : "Monitor registration trends, inventory category distributions, center activation summaries, and access clearance records across the network."}
           </p>
         </div>
@@ -668,28 +720,32 @@ function ReportsPageContent() {
           >
             Registered Schools
           </button>
-          <button
-            onClick={() => setActiveReport("categories")}
-            className={cn(
-              "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
-              activeReport === "categories"
-                ? "bg-card text-foreground shadow-xs border border-border/20"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Classifications
-          </button>
-          <button
-            onClick={() => setActiveReport("items")}
-            className={cn(
-              "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
-              activeReport === "items"
-                ? "bg-card text-foreground shadow-xs border border-border/20"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Item Registry
-          </button>
+          {!isDeptAdmin && (
+            <button
+              onClick={() => setActiveReport("categories")}
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+                activeReport === "categories"
+                  ? "bg-card text-foreground shadow-xs border border-border/20"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Classifications
+            </button>
+          )}
+          {!isDeptAdmin && (
+            <button
+              onClick={() => setActiveReport("items")}
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer",
+                activeReport === "items"
+                  ? "bg-card text-foreground shadow-xs border border-border/20"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Item Registry
+            </button>
+          )}
         </div>
       </div>
 
@@ -717,26 +773,30 @@ function ReportsPageContent() {
             <School className="h-4 w-4" />
           </div>
         </div>
-        <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Classifications</span>
-            <h4 className="text-xl font-bold text-foreground">{globalStats.categories.toLocaleString()}</h4>
-            <p className="text-[10px] text-muted-foreground">Asset category groups</p>
+        {!isDeptAdmin && (
+          <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Classifications</span>
+              <h4 className="text-xl font-bold text-foreground">{globalStats.categories.toLocaleString()}</h4>
+              <p className="text-[10px] text-muted-foreground">Asset category groups</p>
+            </div>
+            <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
+              <Layers className="h-4 w-4" />
+            </div>
           </div>
-          <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
-            <Layers className="h-4 w-4" />
+        )}
+        {!isDeptAdmin && (
+          <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Catalog Inventory</span>
+              <h4 className="text-xl font-bold text-foreground">{globalStats.items.toLocaleString()}</h4>
+              <p className="text-[10px] text-muted-foreground">Trackable assets registry</p>
+            </div>
+            <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
+              <Package className="h-4 w-4" />
+            </div>
           </div>
-        </div>
-        <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Catalog Inventory</span>
-            <h4 className="text-xl font-bold text-foreground">{globalStats.items.toLocaleString()}</h4>
-            <p className="text-[10px] text-muted-foreground">Trackable assets registry</p>
-          </div>
-          <div className="p-2 bg-secondary border border-border/40 rounded text-indigo-400">
-            <Package className="h-4 w-4" />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* 3. Filtering Toolbar */}

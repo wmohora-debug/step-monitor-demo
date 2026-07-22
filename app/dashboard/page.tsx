@@ -547,12 +547,14 @@ export default function DashboardOverviewPage() {
                 <h2 className="text-base font-semibold text-[#172033]">Recent Classroom Check-ins</h2>
                 <p className="text-xs text-[#64748B]">Latest invigilator activity across classrooms</p>
               </div>
-              <Link
-                href="/dashboard/sessions"
-                className="text-xs font-semibold text-[#4F46E5] hover:text-[#3730a3] transition-colors flex items-center gap-1 group"
-              >
-                View logs <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </Link>
+              {isSuper && (
+                <Link
+                  href="/dashboard/sessions"
+                  className="text-xs font-semibold text-[#4F46E5] hover:text-[#3730a3] transition-colors flex items-center gap-1 group"
+                >
+                  View logs <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </Link>
+              )}
             </div>
 
             <div className="divide-y divide-[#E8EAF0]">
@@ -577,9 +579,11 @@ export default function DashboardOverviewPage() {
                   <p className="text-xs text-[#64748B] max-w-sm mt-1">
                     There are no invigilator check-ins logged within the active session week.
                   </p>
-                  <Link href="/dashboard/sessions" className="text-xs font-semibold text-[#4F46E5] hover:underline mt-2">
-                    Review older scan logs →
-                  </Link>
+                  {isSuper && (
+                    <Link href="/dashboard/sessions" className="text-xs font-semibold text-[#4F46E5] hover:underline mt-2">
+                      Review older scan logs →
+                    </Link>
+                  )}
                 </div>
               ) : (
                 recentInvSessions.map((session) => (
@@ -632,21 +636,23 @@ export default function DashboardOverviewPage() {
                   <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#4F46E5] transition-transform group-hover:translate-x-0.5" />
                 </Link>
 
-                <Link
-                  href="/dashboard/sessions"
-                  className="flex items-center justify-between rounded-lg border border-[#E8EAF0] bg-white px-4 py-3 hover:border-[#4F46E5] hover:bg-[#F6F7FB]/50 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded bg-emerald-50 text-emerald-600">
-                      <Activity className="h-4 w-4" />
+                {isSuper && (
+                  <Link
+                    href="/dashboard/sessions"
+                    className="flex items-center justify-between rounded-lg border border-[#E8EAF0] bg-white px-4 py-3 hover:border-[#4F46E5] hover:bg-[#F6F7FB]/50 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded bg-emerald-50 text-emerald-600">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="block text-xs font-semibold text-[#172033]">Activity Scan Logs</span>
+                        <span className="text-[10px] text-[#64748B]">Scans & check-ins</span>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <span className="block text-xs font-semibold text-[#172033]">Activity Scan Logs</span>
-                      <span className="text-[10px] text-[#64748B]">Scans & check-ins</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#4F46E5] transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                    <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#4F46E5] transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                )}
 
                 <Link
                   href="/dashboard/gallery"
