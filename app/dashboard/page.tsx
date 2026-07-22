@@ -280,14 +280,13 @@ export default function DashboardOverviewPage() {
     setMetricsLoading(true);
     setSchoolsError(null);
     setUsersError(null);
-    setCategoriesError(null);
     setItemsError(null);
     setInvSessionsError(null);
 
     const startTime = performance.now();
 
     if (isDeptAdmin) {
-      // Department Admin: Fetch only allowed data (Schools, Categories, Invigilation Sessions)
+      // Department Admin: Fetch only allowed data (Schools and Invigilation Sessions)
       const schoolsPromise = apiClient.get<any>("/admin/schools", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
         .then((res) => {
           setSchoolsCount(res.total || 0);
@@ -295,12 +294,6 @@ export default function DashboardOverviewPage() {
         })
         .catch((err) => {
           setSchoolsError(err.message || "Failed to load schools metadata");
-        });
-
-      const categoriesPromise = apiClient.get<any>("/admin/categories", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
-        .then((res) => setCategoriesCount(res.total || 0))
-        .catch((err) => {
-          setCategoriesError(err.message || "Failed to load categories metadata");
         });
 
       const sessionsPromise = apiClient.get<any>("/admin/invigilation-sessions", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
@@ -312,7 +305,7 @@ export default function DashboardOverviewPage() {
           setInvSessionsError(err.message || "Failed to load classroom sessions metadata");
         });
 
-      await Promise.allSettled([schoolsPromise, categoriesPromise, sessionsPromise]);
+      await Promise.allSettled([schoolsPromise, sessionsPromise]);
     } else {
       // Super Admin default fetching logic
       const schoolsPromise = apiClient.get<any>("/admin/schools", { params: { page: 1, limit: 5 }, suppressErrorLogging: true })
@@ -506,7 +499,7 @@ export default function DashboardOverviewPage() {
         </div>
 
         {/* 2. SUMMARY CARDS - UNIFIED STATISTICS PANEL */}
-        <div className="border border-[#E8EAF0] bg-white rounded-xl divide-y md:divide-y-0 md:divide-x divide-[#E8EAF0] grid grid-cols-1 md:grid-cols-3 overflow-hidden shadow-sm">
+        <div className="border border-[#E8EAF0] bg-white rounded-xl divide-y md:divide-y-0 md:divide-x divide-[#E8EAF0] grid grid-cols-1 md:grid-cols-2 overflow-hidden shadow-sm">
           {/* Card 1: Classroom Sessions */}
           <div className="p-6 flex items-center justify-between">
             <div className="space-y-1">
@@ -525,10 +518,10 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
 
-          {/* Card 2: Registered Centers */}
+          {/* Card 2: Registered Schools */}
           <div className="p-6 flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Registered Centers</span>
+              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Registered Schools</span>
               {schoolsError ? (
                 <div className="text-xs text-red-500 font-medium">Failed to load</div>
               ) : metricsLoading ? (
@@ -536,28 +529,10 @@ export default function DashboardOverviewPage() {
               ) : (
                 <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{schoolsCount.toLocaleString()}</h3>
               )}
-              <p className="text-[11px] text-[#64748B]">Monitored educational centers</p>
+              <p className="text-[11px] text-[#64748B]">Monitored registered schools</p>
             </div>
             <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
               <SchoolIcon className="h-5 w-5" />
-            </div>
-          </div>
-
-          {/* Card 3: Asset Categories */}
-          <div className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Asset Categories</span>
-              {categoriesError ? (
-                <div className="text-xs text-red-500 font-medium">Failed to load</div>
-              ) : metricsLoading ? (
-                <Skeleton className="h-8 w-16 rounded mt-1" />
-              ) : (
-                <h3 className="text-3xl font-bold text-[#172033] tracking-tight">{categoriesCount.toLocaleString()}</h3>
-              )}
-              <p className="text-[11px] text-[#64748B]">Inventory classifications</p>
-            </div>
-            <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[#4F46E5]">
-              <FolderTree className="h-5 w-5" />
             </div>
           </div>
         </div>
@@ -618,7 +593,7 @@ export default function DashboardOverviewPage() {
                           {session.invigilatorName || "Invigilator"} checked into Room {session.classroom?.name || session.classroom?.classroomId || "N/A"}
                         </p>
                         <p className="text-[11px] text-[#64748B] flex items-center gap-1.5">
-                          <SchoolIcon className="h-3 w-3 text-slate-400" /> {session.school?.schoolName || "Unknown Center"}
+                          <SchoolIcon className="h-3 w-3 text-slate-400" /> {session.school?.schoolName || "Unknown School"}
                         </p>
                       </div>
                     </div>

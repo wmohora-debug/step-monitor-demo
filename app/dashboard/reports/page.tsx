@@ -666,7 +666,7 @@ function ReportsPageContent() {
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            Registered Centers
+            Registered Schools
           </button>
           <button
             onClick={() => setActiveReport("categories")}
@@ -709,7 +709,7 @@ function ReportsPageContent() {
         )}
         <div className="border border-border/45 bg-secondary/35 rounded-xl p-4 flex items-center justify-between shadow-xs">
           <div className="space-y-0.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Registered Centers</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Registered Schools</span>
             <h4 className="text-xl font-bold text-foreground">{globalStats.schools.toLocaleString()}</h4>
             <p className="text-[10px] text-muted-foreground">Active monitored schools</p>
           </div>

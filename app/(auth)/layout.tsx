@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { Shield, Activity, KeyRound, Radio } from "lucide-react";
+import { Shield, KeyRound, Radio } from "lucide-react";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -37,7 +37,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                   STEP Monitor
                 </span>
                 <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest mt-0.5">
-                  Secure Node
+                  State Wise Technical Education Programme
                 </span>
               </div>
             </div>
@@ -50,33 +50,33 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" /> System Active
               </span>
               <h1 className="text-2xl font-black text-slate-100 tracking-tight leading-tight">
-                Super Admin Access Portal
+                STEP Administration Portal
               </h1>
               <p className="text-[11px] text-slate-400 leading-relaxed max-w-xs">
-                Welcome to the administration console. Log in to synchronize school networks, check scanner logs, and verify asset registries.
+                STEP stands for State Wise Technical Education Programme. Log in to manage school operations, monitor activity, and maintain programme records.
               </p>
             </div>
 
-            {/* HUD Status Box */}
+            {/* Programme information box */}
             <div className="border border-slate-800/80 bg-slate-900/40 p-4 rounded-2xl space-y-3.5 backdrop-blur-xs">
               <div className="flex justify-between items-center text-[10px] text-slate-400 font-semibold uppercase tracking-wider pb-2 border-b border-slate-800/50">
-                <span className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-indigo-400" /> Console Telemetry</span>
-                <span className="text-indigo-400 font-bold">V4.2.1</span>
+                <span>Programme Overview</span>
+                <span className="text-indigo-400 font-bold">STEP</span>
               </div>
               <div className="space-y-2.5 text-[10px]">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-bold">Network Gate</span>
-                  <span className="font-mono text-slate-350 font-bold">43.205.146.243</span>
+                  <span className="text-slate-500 font-bold">Programme Name</span>
+                  <span className="text-slate-350 font-bold text-right">State Wise Technical Education Programme</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-bold">Auth Method</span>
+                  <span className="text-slate-500 font-bold">Access Type</span>
                   <span className="font-mono text-slate-350 font-bold flex items-center gap-1">
-                    <KeyRound className="h-3 w-3 text-indigo-400" /> JWT Bearer
+                    <KeyRound className="h-3 w-3 text-indigo-400" /> Authorized Admin Login
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-bold">Clearance Level</span>
-                  <span className="font-mono text-indigo-400 font-bold">SuperAdmin / Admin</span>
+                  <span className="text-slate-500 font-bold">Coverage</span>
+                  <span className="font-mono text-indigo-400 font-bold">Statewide Technical Education</span>
                 </div>
               </div>
             </div>
@@ -98,7 +98,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <Shield className="h-5.5 w-5.5" />
             </div>
             <h2 className="text-lg font-black tracking-tight text-slate-100">
-              STEP Control Console
+              STEP Administration Portal
             </h2>
             <p className="text-[10px] text-slate-400 font-semibold mt-1">
               Authorized Administrative clearance required.
